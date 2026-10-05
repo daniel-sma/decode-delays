@@ -483,3 +483,10 @@ span.ws-tab { padding: 0; }
 .row.static.sub, .events li { min-height: 28px; padding: 0 var(--s-3); background: transparent; box-shadow: none; }
 .row.static.sub .row-main span { color: var(--ink-2); }
 .events li { color: var(--ink-2); }
+
+/* ---------- scrubber edges: tags never hang past the track (that widened the page and shifted it sideways) */
+.flight-stage, .scrubber, .scrub-body { overflow: hidden; }
+.scrubber { user-select: none; } /* dragging the playhead doesn't select the ruler and leg text */
+.scrub-head.at-end em { transform: translateX(-100%); }
+.scrub-head.at-start em { transform: none; }
+.scrub-hover.flip em { left: auto; right: 4px; }

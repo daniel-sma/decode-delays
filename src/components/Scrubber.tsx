@@ -75,7 +75,8 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
   const [hover, setHover] = useState<number | null>(null)
   const legs = useMemo(() => chain.filter((i) => !f.status[i].startsWith('C')), [chain, f])
   const span = win.t1 - win.t0
-  const pct = (t: number) => `${((t - win.t0) / span) * 100}%`
+  const frac = (t: number) => (t - win.t0) / span
+  const pct = (t: number) => `${frac(t) * 100}%`
 
   // Scale ticks, labels and bar width to the length of the plane's day (some run past 24h).
   const labelEvery = nice(span / 8, [60, 120, 180, 360, 720])
@@ -204,8 +205,11 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
               />
             ))}
           </div>
-          {hover != null && hoverLeg == null && <span className="scrub-hover" style={{ left: pct(hover) }}><em>{clock24(hover)}</em></span>}
-          <span className="scrub-head" style={{ left: pct(time) }}>
+          {hover != null && hoverLeg == null && (
+            <span className={`scrub-hover${frac(hover) > 0.9 ? ' flip' : ''}`} style={{ left: pct(hover) }}><em>{clock24(hover)}</em></span>
+          )}
+          {/* The time tag stays inside the track at either end instead of hanging past it. */}
+          <span className={`scrub-head${frac(time) > 0.97 ? ' at-end' : frac(time) < 0.03 ? ' at-start' : ''}`} style={{ left: pct(time) }}>
             <i />
             <em>{clock24(time)}</em>
           </span>
