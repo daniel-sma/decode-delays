@@ -5,23 +5,20 @@
    Spacing scale: 4 / 8 / 12 / 16 / 20. */
 :root {
   color-scheme: dark;
-  /* Blueprint dark neutrals; every accent is Southwest yellow. */
-  --bg-app: #1b1d21;      /* page */
-  --bg-panel: #26292e;    /* panels, sidebar */
-  --bg-head: #2b2e34;     /* KPI strip, section and table headers */
-  --bg-row: #32363c;      /* cards, rows, fields */
-  --bg-hover: #3a3f46;
-  --bg-table: #1f2226;    /* table body */
-  --line: #33373d;
-  --line-strong: #43484f;
+  /* Blueprint dark neutrals, as in Palantir's control-tower apps. Southwest appears only as the app icon. */
+  --bg-app: #111418;      /* Blueprint black: page and map frame */
+  --bg-panel: #1c2127;    /* dark-gray-1: panels */
+  --bg-head: #252a31;     /* dark-gray-2: app bar, section headers */
+  --bg-row: #2f343c;      /* dark-gray-3: cards, rows, fields */
+  --bg-hover: #383e47;    /* dark-gray-4 */
+  --line: #2f343c;
+  --line-strong: #404854; /* dark-gray-5 */
   --ink-1: #f6f7f9;
-  --ink-2: #abb3bf;
-  --ink-3: #8f99a8;
-  --accent: #fbaa18;      /* Southwest yellow */
-  --accent-hi: #fbaa18;
-  --accent-soft: rgba(251, 170, 24, 0.14);
-  --on-accent: #1c1e22;   /* text on yellow */
-  --sel: rgba(251, 170, 24, 0.16);
+  --ink-2: #abb3bf;       /* gray-4 */
+  --ink-3: #8f99a8;       /* gray-3 */
+  --accent: #2d72d2;      /* blue-3 */
+  --accent-hi: #4c90f0;   /* blue-4 */
+  --sel: rgba(45, 114, 210, 0.25);
   --ok: #32a467;
   --warn: #ec9a3c;
   --danger: #e76a6e;
@@ -33,13 +30,6 @@
   --s-5: 20px;
   --side-w: 380px;
   --mono: 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
-  /* Blueprint's own primary intent and focus colour */
-  --bp-intent-primary-rest: #fbaa18;
-  --bp-intent-primary-hover: #e0960f;
-  --bp-intent-primary-active: #c4820c;
-  --bp-intent-primary-disabled: #fdc764;
-  --bp-intent-primary-foreground: #1c1e22;
-  --bp-emphasis-focus-color: #fbaa18;
 }
 
 /* Square corners throughout, as in Gotham/Foundry chrome. */
@@ -68,7 +58,7 @@ body.bp6-dark, body { background: var(--bg-app); color: var(--ink-1); }
 .bp6-dark .bp6-section-header + .bp6-collapse .bp6-section-card:first-child,
 .bp6-dark .bp6-section-header + div > .bp6-section-card:first-child { border-top: 0; }
 .bp6-dark .bp6-input { background: var(--bg-app); box-shadow: inset 0 0 0 1px var(--line-strong); }
-.bp6-dark .bp6-input:focus { box-shadow: inset 0 0 0 1px var(--accent-hi), 0 0 0 2px rgba(251, 170, 24, 0.3); }
+.bp6-dark .bp6-input:focus { box-shadow: inset 0 0 0 1px var(--accent-hi), 0 0 0 2px rgba(45, 114, 210, 0.3); }
 .bp6-dark .bp6-navbar { background: var(--bg-app); box-shadow: inset 0 -1px 0 var(--line); }
 .bp6-dark .bp6-table-container, .bp6-dark .bp6-table-quadrant { background: var(--bg-panel); }
 .bp6-dark .bp6-table-cell { background-color: var(--bg-panel); box-shadow: inset 0 -1px 0 var(--line); color: var(--ink-1); }
@@ -244,7 +234,7 @@ span.ws-tab { padding: 0; }
 .tick em { position: absolute; bottom: 10px; left: 0; transform: translateX(-50%); font-style: normal; font-family: var(--mono); font-size: 10px; color: var(--ink-2); white-space: nowrap; }
 .tick em sup, .scrub-tz sup { font-size: 8px; color: var(--late); margin-left: 1px; }
 .scrub-legs { position: absolute; left: 0; right: 0; top: 24px; height: 18px; }
-.leg { position: absolute; top: 2px; height: 14px; background: rgba(251, 170, 24, 0.18); box-shadow: inset 0 0 0 1px rgba(251, 170, 24, 0.5); overflow: hidden; }
+.leg { position: absolute; top: 2px; height: 14px; background: rgba(45, 114, 210, 0.2); box-shadow: inset 0 0 0 1px rgba(76, 144, 240, 0.5); overflow: hidden; }
 .leg em { display: block; text-align: center; padding: 0 5px; font-style: normal; font-family: var(--mono); font-size: 10px; line-height: 14px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scrub-hist { position: absolute; left: 0; right: 0; top: 44px; bottom: 0; }
 .scrub-hist .grid { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--line); }
@@ -253,7 +243,7 @@ span.ws-tab { padding: 0; }
 .scrub-head { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; }
 .scrub-head i { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; background: var(--accent-hi); }
 .scrub-head i::before { content: ''; position: absolute; top: 0; left: -4px; width: 10px; height: 10px; background: var(--accent-hi); }
-.scrub-head em { position: absolute; bottom: 4px; left: 0; transform: translateX(-50%); padding: 1px 6px; background: var(--accent); color: var(--on-accent); font-style: normal; font-family: var(--mono); font-size: 10px; white-space: nowrap; }
+.scrub-head em { position: absolute; bottom: 4px; left: 0; transform: translateX(-50%); padding: 1px 6px; background: var(--accent); color: #fff; font-style: normal; font-family: var(--mono); font-size: 10px; white-space: nowrap; }
 .scrub-hover { position: absolute; top: 22px; bottom: 0; width: 1px; background: rgba(255, 255, 255, 0.3); pointer-events: none; }
 .scrub-hover em { position: absolute; top: 2px; left: 4px; font-style: normal; font-family: var(--mono); font-size: 10px; color: var(--ink-2); }
 
@@ -357,24 +347,15 @@ span.ws-tab { padding: 0; }
 .ws-tab-close { width: 34px; padding-right: 8px; }
 .ws-tab .bp6-icon { color: #8a909a; }
 .ws-tab:hover { background: #1d2025; color: #e8eaed; }
-.ws-tab.on { background: #23272e; color: #fff; box-shadow: inset 0 3px 0 #fbaa18, inset 1px 0 0 #2e3238, inset -1px 0 0 #2e3238; }
-.ws-tab.on .bp6-icon, .ws-tab.on .ws-tab-close .bp6-icon { color: #fbaa18; }
+.ws-tab.on { background: #23272e; color: #fff; box-shadow: inset 0 3px 0 #ffbf27, inset 1px 0 0 #2e3238, inset -1px 0 0 #2e3238; }
+.ws-tab.on .bp6-icon, .ws-tab.on .ws-tab-close .bp6-icon { color: #ffbf27; }
 .ws-tab-close:hover .bp6-icon { color: #fff; }
 
-/* ---------- home, per the mockup: KPI strip, then one panel with search and table */
-.home-main { gap: 32px; padding: 24px 40px; }
-.kpis { background: var(--line); box-shadow: 0 0 0 1px var(--line); }
-.kpis .stat.bp6-card { background: var(--bg-head); }
-.stat-icon { background: var(--accent-soft); }
-.stat-icon .bp6-icon { color: var(--accent); }
-.table-panel { flex: 1 1 auto; min-height: 280px; display: flex; flex-direction: column; background: var(--bg-head); box-shadow: inset 0 0 0 1px var(--line); }
-.table-panel .search-area { padding: var(--s-5) var(--s-5) var(--s-5); border-bottom: 1px solid var(--line); }
-.table-panel .bp6-input-group .bp6-input { background: #121417; }
-.table-panel .table-card { flex: 1; min-height: 180px; position: relative; }
-.table-panel .table-card .bp6-table-container { position: absolute; inset: 0; }
-.bp6-dark .table-panel .bp6-table-cell { background-color: var(--bg-table); line-height: 30px; font-size: 13px; }
-.bp6-dark .table-panel .bp6-table-quadrant, .bp6-dark .table-panel .bp6-table-container { background: var(--bg-table); }
-.search-meta { display: inline-flex; align-items: center; gap: var(--s-2); height: 100%; padding-right: var(--s-2); }
-.search-meta .filter-count { font-size: 12px; }
-@media (max-width: 900px) { .home-main { padding: var(--s-4); gap: var(--s-4); } .table-panel .table-card { flex: none; height: 480px; } }
-.search-area .bp6-input-group.bp6-large .bp6-input-action { top: 0; bottom: 0; display: flex; align-items: center; }
+/* Search box actions (Clear filters, clear search), vertically centred */
+.search-meta { display: inline-flex; align-items: center; gap: var(--s-1); height: 100%; padding-right: var(--s-1); }
+.home-table-section .bp6-input-group.bp6-large .bp6-input-action { top: 0; bottom: 0; display: flex; align-items: center; }
+/* Column filter buttons: just the icon, no box behind it */
+.bp6-dark .bp6-table-th-menu .bp6-icon,
+.bp6-dark .bp6-table-th-menu.bp6-popover-open .bp6-icon,
+.bp6-table-th-menu .bp6-icon { background: transparent !important; box-shadow: none !important; border-radius: 0; }
+.bp6-table-th-menu-container-background { display: none; }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, Icon, InputGroup, NonIdealState } from '@blueprintjs/core'
+import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
 import { CAT_META, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
@@ -180,30 +180,29 @@ export default function HomeView({ day, onOpenFlight }: Props) {
             <Stat icon="cross-circle" label="Cancelled" value={fmt(cancelled)} />
         </div>
 
-        <div className="table-panel">
-          <div className="search-area">
+        <Section className="home-table-section">
+          <SectionCard padded>
             <InputGroup
               size="large"
               leftIcon="search"
               placeholder="Search a tail number or a flight number, e.g. WN 4067 or N7740A"
               value={q}
               onValueChange={(v) => { setQ(v); setSelected([]) }}
-              spellCheck={false}
-              rightElement={
+              rightElement={(filtersSet || q) ? (
                 <span className="search-meta">
                   {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
-                  <span className="filter-count">{fmt(rows.length)} {rows.length === 1 ? 'flight' : 'flights'}</span>
                   {q && <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} />}
                 </span>
-              }
+              ) : undefined}
+              spellCheck={false}
             />
             {singleTail && rows.length > 0 && (
               <Callout className="tail-callout" icon={null} compact>
                 <RippleChain day={day} chain={tailChain(day, rows[0])} selected={-1} onSelect={onOpenFlight} />
               </Callout>
             )}
-          </div>
-          <div className="table-card" ref={cardRef}>
+          </SectionCard>
+          <SectionCard padded={false} className="table-card" ref={cardRef}>
             {rows.length === 0 ? (
               <NonIdealState icon="search" title="No matching flights" description={`Nothing on ${prettyDate(day.date)} matches. Try clearing filters.`} />
             ) : (
@@ -240,8 +239,8 @@ export default function HomeView({ day, onOpenFlight }: Props) {
                 ))}
               </Table2>
             )}
-          </div>
-        </div>
+          </SectionCard>
+        </Section>
       </div>
     </div>
   )

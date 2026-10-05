@@ -27,7 +27,7 @@ const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery
 
 type RGBA = [number, number, number, number]
 const LATE: RGBA = [236, 154, 60, 255] // Blueprint orange-4: warning
-const ON_TIME: RGBA = [171, 179, 191, 255] // Blueprint gray-4: on time is neutral; yellow is reserved for the accent
+const ON_TIME: RGBA = [76, 144, 240, 255] // Blueprint blue-4
 const WHITE: RGBA = [255, 255, 255, 255]
 const PLANE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#fff" d="M12 2c.8 0 1.4.9 1.4 2v5.2l7.6 4.6v2l-7.6-2.3v4.6l2.2 1.7V21L12 20l-3.6 1v-1.2l2.2-1.7v-4.6L3 15.8v-2l7.6-4.6V4c0-1.1.6-2 1.4-2z"/></svg>')}`
 
@@ -226,7 +226,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       </div>
 
       <div className="map-legend">
-        <span><i style={{ background: '#abb3bf' }} />On time</span>
+        <span><i style={{ background: '#4c90f0' }} />On time</span>
         <span><i style={{ background: '#ec9a3c' }} />15+ min late</span>
         <span><i className="sel" />Selected</span>
         <span><i className="future" />Not flown yet</span>
