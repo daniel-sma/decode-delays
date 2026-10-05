@@ -18,7 +18,7 @@ const states = feature(topo, topo.objects.states)
 
 // Dark vector basemap: near-black water (the map frame behind the canvas), dark land, faint borders and
 // water-body labels, so the routes are the brightest thing on the map.
-const LAND: RGBA = [29, 34, 41, 255]
+const LAND: RGBA = [37, 33, 30, 255] // #25211E
 const COAST: RGBA = [255, 255, 255, 26]
 const BORDER: RGBA = [255, 255, 255, 46]
 const STATE: RGBA = [255, 255, 255, 22]
@@ -181,7 +181,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     new ScatterplotLayer<number>({
       id: 'airports', data: airports,
       getPosition: (a) => [day.airports[a].lon, day.airports[a].lat], getRadius: 4, radiusUnits: 'pixels',
-      getFillColor: WHITE, stroked: true, getLineColor: [17, 21, 26, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
+      getFillColor: WHITE, stroked: true, getLineColor: [11, 11, 11, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
     }),
     new IconLayer({
       id: 'plane', data: plane ? [plane] : [],
