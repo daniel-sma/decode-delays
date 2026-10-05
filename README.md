@@ -1,7 +1,7 @@
 # DeTrace
 
 > Concept work: a Southwest Airlines operations tool for tracing delays to their root cause. Not affiliated
-> with or endorsed by Southwest Airlines; the logo is used for a portfolio mock-up only.
+> with or endorsed by Southwest Airlines; the livery-style plane marker is used for a portfolio mock-up only.
 
 **Where US flight delays actually started.**
 

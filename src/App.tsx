@@ -109,7 +109,7 @@ export default function App() {
       <Navbar className="topbar">
         <NavbarGroup align={Alignment.START} className="topbar-left">
           <NavbarHeading className="brand">
-            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="Southwest DeTrace" width={32} height={32} />
+            <span>NOC</span>
           </NavbarHeading>
           <NavbarDivider />
           <div className="tabs" role="tablist">
