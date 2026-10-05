@@ -78,21 +78,26 @@ Outputs go to `public/data/`: `summary.json` (month strip and trace stats) and `
 The UI is built on **[Blueprint](https://blueprintjs.com/docs/)** (`@blueprintjs/core`, `icons`, `table`, v6),
 Palantir's open-source React toolkit for data-dense interfaces, in its dark theme.
 
-The look is Blueprint's default dark theme with square corners, on one spacing scale (4/8/12/16/20).
-Causes are told apart by Blueprint icons (weather `cloud`, airspace `antenna`, airline `wrench`, security
-`shield`, untraced `help`, late aircraft `history`), not colour. The flight page's scrubber borrows from
-Palantir's ops-console video timelines.
+The look follows Palantir's operational design language (Gotham, Foundry, Apollo) on Blueprint's dark theme:
+dense but aligned panels told apart by background and 1px borders rather than shadows, small uppercase section
+headers, workspace tabs in the top bar, square corners, monospace for times and identifiers, status shown as
+Blueprint intent tags (ON TIME, +2h 13m, CANCELLED), and causes identified by icons and labels, never colour
+alone. The flight page puts a list-style sidebar on the left and a satellite map with an ops-console playback
+scrubber on the right.
+
+The map's satellite base is NASA Blue Marble (public domain), cropped to the US and reprojected to Web
+Mercator by `pipeline/make_basemap.py` and bundled at `public/basemap/conus.jpg`. Where the browser can reach
+Esri World Imagery, its sharper tiles draw on top; where it can't, the bundled image shows.
 
 | File | What it does |
 |---|---|
-| `src/App.tsx` | Navbar with breadcrumbs and the calendar date picker; switches between home and a flight |
+| `src/App.tsx` | Navbar with workspace tabs (delays table, open flight) and the calendar date picker |
 | `src/components/DayPicker.tsx` | Month calendar in a popover. Only days with exported data can be picked; others explain why |
 | `src/components/HomeView.tsx` | **Home:** KPI tiles, a root-cause grid whose cause and airport chips filter the table, tail-number search above a `Table2` of the biggest delays |
 | `src/components/FlightView.tsx` | **Flight page:** map + scrubber + sidebar, sharing one clock. The sidebar follows the leg in the air at the playhead |
 | `src/components/FlightMap.tsx` | deck.gl map of one tail's legs (flown legs by root cause, unflown faint, selected white), the plane's position at the playhead, airport chips and detail cards |
 | `src/components/Scrubber.tsx` | Playback: clock, transport controls (start, slower, −15m, previous event, play, next event, +15m, faster), hour ruler, leg spans, and a histogram of how late the plane is running, coloured by root cause |
-| `src/components/Panels.tsx` | Flight sidebar: times, root-cause summary with weather evidence, reported vs decoded, the plane's day, and a collapsed breakdown |
-| `src/components/CauseCompare.tsx` | Reported vs decoded 100% bars |
+| `src/components/Panels.tsx` | Flight sidebar: header with status, route fields, root-cause rows, the aircraft's flights, and an event log |
 | `src/theme.ts`, `src/styles.css` | Category icons and labels, formatting, layout |
 
 **Colour:** one Blueprint blue marks lateness (map legs, the scrubber histogram, the plane's-day bars); grey means on time or inherited. Category identity is always an icon plus a label.

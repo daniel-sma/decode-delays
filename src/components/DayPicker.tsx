@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Button, Classes, Popover, Tooltip } from '@blueprintjs/core'
+import { Button, Popover, Tooltip } from '@blueprintjs/core'
 import type { Summary } from '../data'
 import { prettyDate } from '../theme'
 
@@ -16,8 +16,7 @@ export default function DayPicker({ summary, value, onChange }: { summary: Summa
   const delayed = new Map(summary.days.map((d) => [d.date, d.delayed]))
   const monthName = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
   const list = summary.availableDays.map((d) => Number(d.slice(8))).join(', ')
-  const unavailable = `Data is only available for ${monthName.split(' ')[0]} ${list}`
-  const latest = `Only ${monthName} data is available (the latest BTS release)`
+  const unavailable = `No data · available ${monthName.split(' ')[0].slice(0, 3)} ${list}`
 
   const cells: (number | null)[] = [...Array(first).fill(null), ...Array.from({ length: days }, (_, k) => k + 1)]
   while (cells.length % 7) cells.push(null)
@@ -25,9 +24,9 @@ export default function DayPicker({ summary, value, onChange }: { summary: Summa
   const calendar = (
     <div className="daypicker">
       <div className="dp-head">
-        <Tooltip content={latest} placement="top"><Button variant="minimal" size="small" icon="chevron-left" aria-disabled onClick={() => setNotice(latest)} aria-label="Previous month" /></Tooltip>
+        <Button variant="minimal" size="small" icon="chevron-left" disabled aria-label="Previous month" />
         <strong>{monthName}</strong>
-        <Tooltip content={latest} placement="top"><Button variant="minimal" size="small" icon="chevron-right" aria-disabled onClick={() => setNotice(latest)} aria-label="Next month" /></Tooltip>
+        <Button variant="minimal" size="small" icon="chevron-right" disabled aria-label="Next month" />
       </div>
       <div className="dp-grid" role="grid" aria-label={monthName}>
         {WEEKDAYS.map((w, k) => <span key={k} className="dp-wd">{w}</span>)}
@@ -55,7 +54,7 @@ export default function DayPicker({ summary, value, onChange }: { summary: Summa
             : <Tooltip key={k} content={unavailable} placement="top" hoverOpenDelay={150}>{cell}</Tooltip>
         })}
       </div>
-      <p className={`dp-note ${notice ? 'warn' : Classes.TEXT_MUTED}`}>{notice ?? 'Highlighted days have data: the six most disrupted days of the month.'}</p>
+      {notice && <p className="dp-note warn">{notice}</p>}
     </div>
   )
 

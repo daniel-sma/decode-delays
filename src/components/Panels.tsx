@@ -1,198 +1,197 @@
 import { useMemo } from 'react'
-import { AnchorButton, Callout, Card, Classes, H3, HTMLTable, Icon, Section, SectionCard, Tag } from '@blueprintjs/core'
-import { CATS, decodedByCat, flightLabel, rootOf, route, sum, type Day } from '../data'
-import { CAT_META, clock, dur, hourLabel, prettyDate } from '../theme'
-import CauseCompare from './CauseCompare'
-import CatLabel from './CatLabel'
+import { Button, Card, Classes, Icon, Tag, type Intent } from '@blueprintjs/core'
+import type { IconName } from '@blueprintjs/icons'
+import { CATS, REPORTED, flightLabel, route, sum, type Day } from '../data'
+import { CAT_META, REPORTED_META, dur, hourLabel, pct } from '../theme'
+import { actualArr, actualDep, clock24, dayOffset } from './Scrubber'
 
-const CANCEL = { A: 'Carrier', B: 'Weather', C: 'NAS', D: 'Security' } as Record<string, string>
+const CANCEL = { A: 'carrier', B: 'weather', C: 'NAS', D: 'security' } as Record<string, string>
+
+/** Status tag for a flight, Blueprint intents: on time, late, very late, cancelled. */
+export function statusTag(day: Day, i: number, minimal = true) {
+  const f = day.flights
+  if (f.status[i].startsWith('C')) return <Tag minimal={minimal} intent="danger" className="status-tag">CANCELLED</Tag>
+  if (f.status[i] === 'D') return <Tag minimal={minimal} intent="danger" className="status-tag">DIVERTED</Tag>
+  const a = f.arrDelay[i]
+  if (a == null || a < 15) return <Tag minimal={minimal} intent="success" className="status-tag">ON TIME</Tag>
+  const intent: Intent = a >= 180 ? 'danger' : 'warning'
+  return <Tag minimal={minimal} intent={intent} className="status-tag">+{dur(a)}</Tag>
+}
+
+const t24 = (m: number) => (
+  <span className="t24">{clock24(m)}{dayOffset(m) && <sup>{dayOffset(m)}</sup>}</span>
+)
 
 // ------------------------------------------------------------------ flight sidebar
 
-export function FlightPanel({ day, index, chain, onSelect }: {
-  day: Day; index: number; chain: number[]; onSelect: (i: number) => void
+export function FlightPanel({ day, index, chain, onSelect, onClose }: {
+  day: Day; index: number; chain: number[]; onSelect: (i: number) => void; onClose: () => void
 }) {
   const f = day.flights
-  const contribs = f.decoded[index]
-  const arr = f.arrDelay[index]
-  const status = f.status[index]
-  const own = contribs.filter((c) => c[4] === 0)
-  const inherited = contribs.filter((c) => c[4] > 0)
-  const ownMin = sum(own.map((c) => c[5]))
-  const inhMin = sum(inherited.map((c) => c[5]))
-  const root = rootOf(day, index)
-  const rootCode = root ? day.airports[root.airport]?.code : undefined
+  const o = day.airports[f.o[index]], d = day.airports[f.d[index]]
+  const cancelled = f.status[index].startsWith('C')
+  const dep = actualDep(day, index), arr = actualArr(day, index)
 
-  // Inherited minutes grouped by the flight where they started.
-  const roots = useMemo(() => {
-    const m = new Map<number, { min: number; c: (typeof contribs)[number] }>()
-    for (const c of inherited) {
-      const cur = m.get(c[2])
-      if (!cur) m.set(c[2], { min: c[5], c })
-      else {
-        cur.min += c[5]
-        if (c[5] > cur.c[5]) cur.c = c
-      }
+  // Root causes grouped by (cause, airport), biggest first.
+  const causes = useMemo(() => {
+    const m = new Map<string, { cat: number; ap: number; min: number; hops: number; root: number }>()
+    for (const [cat, ap, root, , hops, min] of f.decoded[index]) {
+      const k = `${cat}:${ap}`
+      const cur = m.get(k)
+      if (cur) { cur.min += min; if (hops > cur.hops) { cur.hops = hops; cur.root = root } }
+      else m.set(k, { cat, ap, min, hops, root })
     }
-    return [...m.entries()].sort((a, b) => b[1].min - a[1].min)
-  }, [inherited])
+    return [...m.values()].sort((a, b) => b.min - a.min)
+  }, [f, index])
+  const total = sum(causes.map((c) => c.min))
+  const reported = f.causes[index]
 
-  let sentence: React.ReactNode
-  if (status.startsWith('C')) {
-    sentence = <>Cancelled. The airline reported the cause as <b>{CANCEL[status.slice(1)] ?? 'unknown'}</b>.</>
-  } else if (status === 'D') {
-    sentence = <>Diverted to another airport.</>
-  } else if (arr == null || arr < 15) {
-    sentence = <>Arrived {arr == null ? '' : arr <= 0 ? `${-arr} min early` : `${arr} min late`}, under BTS’s 15-minute threshold, so no cause is recorded.</>
-  } else {
-    const top = roots[0]
-    sentence = (
-      <>
-        Arrived <b>{dur(arr)}</b> late.{' '}
-        {ownMin > 0 && <>{dur(ownMin)} started on this flight ({topCat(own)}). </>}
-        {top && CATS[top[1].c[0]] === 'untraced' && roots.length === 1 ? (
-          <>
-            <b>{dur(inhMin)}</b> was inherited from earlier flights. The trail stops at{' '}
-            <AnchorButton variant="minimal" size="small" intent="primary" className="inline-btn" onClick={() => onSelect(top[0])}>{flightLabel(day, top[0])}</AnchorButton>{' '}
-            at <b>{day.airports[top[1].c[1]]?.code ?? '?'}</b>: the delay it brought in has no cause on file.
-          </>
-        ) : top && (
-          <>
-            <b>{dur(inhMin)}</b> was inherited
-            {top[1].c[4] > 1 ? <>, mostly from {top[1].c[4]} flights earlier</> : <> from the previous flight</>}:{' '}
-            <b>{CAT_META[CATS[top[1].c[0]]].label.toLowerCase()}</b>{' '}
-            at <b>{day.airports[top[1].c[1]]?.code ?? '?'}</b> around {clock(top[1].c[3])}, on{' '}
-            <AnchorButton variant="minimal" size="small" intent="primary" className="inline-btn" onClick={() => onSelect(top[0])}>{flightLabel(day, top[0])}</AnchorButton>.
-          </>
-        )}
-      </>
-    )
-  }
-
-  const dep = f.sdep[index] + (f.depDelay[index] ?? 0)
-  const arrT = f.sarr[index] + (arr ?? 0)
-  const cancelled = status.startsWith('C')
-  const evidence = rootCode ? weatherEvidence(day.weather[rootCode]) : null
+  const events = useMemo(() => buildEvents(day, index), [day, index])
 
   return (
-    <div className="panel-body">
-      <div>
-        <p className="eyebrow">{f.tail[index] || 'No tail number'} · {prettyDate(day.date)}</p>
-        <H3 className="panel-title">{flightLabel(day, index)} <span className="title-route">{route(day, index)}</span></H3>
+    <div className="side">
+      <div className="side-head">
+        <Icon icon="airplane" size={16} className="side-head-icon" />
+        <div className="side-head-text">
+          <strong>{flightLabel(day, index)}</strong>
+          <span>{f.tail[index] || 'No tail'} · {o.code} → {d.code}</span>
+        </div>
+        {statusTag(day, index, false)}
+        <Button variant="minimal" size="small" icon="cross" aria-label="Back to biggest delays" onClick={onClose} />
       </div>
 
-      <dl className="times">
-        <dt>Departure</dt>
-        <dd><span className={Classes.TEXT_MUTED}>{clock(f.sdep[index])}</span>{!cancelled && f.depDelay[index] != null && <> → {clock(dep)}</>}</dd>
-        <dt>Arrival</dt>
-        <dd><span className={Classes.TEXT_MUTED}>{clock(f.sarr[index])}</span>{!cancelled && arr != null && <> → {clock(arrT)}</>}</dd>
-        <dt>Delay</dt>
-        <dd>{cancelled ? <Tag minimal intent="danger">Cancelled</Tag> : arr != null && arr >= 15 ? <b className="late">+{dur(arr)}</b> : 'On time'}</dd>
-      </dl>
+      <SideSection title="Route">
+        <div className="field">
+          <Icon icon="map-marker" size={14} />
+          <span className="field-main"><b>{o.code}</b> <span className={Classes.TEXT_MUTED}>{o.city}</span></span>
+          <span className="field-time">{t24(f.sdep[index])}{!cancelled && f.depDelay[index] != null && <> → {t24(dep)}</>}</span>
+        </div>
+        <div className="field">
+          <Icon icon="flag" size={14} />
+          <span className="field-main"><b>{d.code}</b> <span className={Classes.TEXT_MUTED}>{d.city}</span></span>
+          <span className="field-time">{t24(f.sarr[index])}{!cancelled && f.arrDelay[index] != null && <> → {t24(arr)}</>}</span>
+        </div>
+      </SideSection>
 
-      <Callout className="summary" icon={root ? CAT_META[CATS[root.cat]].icon : 'help'} intent={root ? 'primary' : 'none'} title={root ? `${CAT_META[CATS[root.cat]].label} at ${rootCode}` : 'No root cause recorded'}>
-        <p className="sentence">{sentence}</p>
-        {evidence && <p className="evidence"><Icon icon="cloud" size={12} /> {rootCode}: {evidence}</p>}
-      </Callout>
+      <SideSection title="Root cause" right={total ? dur(total) : undefined}>
+        {causes.length === 0 ? (
+          <p className="side-empty">{cancelled ? `Cancelled; airline cited ${CANCEL[f.status[index].slice(1)] ?? 'no cause'}.` : 'Under 15 minutes late, so no cause is recorded.'}</p>
+        ) : (
+          <ul className="rows">
+            {causes.slice(0, 5).map((c, k) => {
+              const meta = CAT_META[CATS[c.cat]]
+              return (
+                <li key={k}>
+                  <button className="row" onClick={() => c.root >= 0 && onSelect(c.root)} disabled={c.root < 0 || c.root === index}>
+                    <Icon icon={meta.icon} size={14} />
+                    <span className="row-main">
+                      <b>{meta.short} · {day.airports[c.ap]?.code ?? '?'}</b>
+                      <span>{c.hops === 0 ? 'On this flight' : `${c.hops} flight${c.hops > 1 ? 's' : ''} back · ${flightLabel(day, c.root)}`}</span>
+                    </span>
+                    <span className="row-num">{dur(c.min)}</span>
+                    <Tag minimal className="row-tag">{pct(c.min, total)}</Tag>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {reported && (
+          <p className="side-note">
+            Filed with BTS as {REPORTED.map((k, i) => [k, reported[i]] as const).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+              .map(([k, v]) => `${REPORTED_META[k].label} ${pct(v, sum(reported))}`).join(' · ')}
+          </p>
+        )}
+      </SideSection>
 
-      {f.causes[index] && (
-        <Section compact title="Reported vs decoded" icon="comparison">
-          <SectionCard><CauseCompare reported={f.causes[index]!} decoded={decodedByCat(contribs)} /></SectionCard>
-        </Section>
-      )}
+      <SideSection title={`Aircraft ${f.tail[index] || ''}`} right={`${chain.length} flights`}>
+        <RippleChain day={day} chain={chain} selected={index} onSelect={onSelect} />
+      </SideSection>
 
-      <Section compact title="The plane’s day" icon="airplane" subtitle={`${chain.length} flight${chain.length === 1 ? '' : 's'} · select one to trace it`}>
-        <SectionCard>
-          <RippleChain day={day} chain={chain} selected={index} roots={new Set(roots.map(([r]) => r))} onSelect={onSelect} />
-        </SectionCard>
-      </Section>
-
-      {contribs.length > 0 && (
-        <Section compact collapsible collapseProps={{ defaultIsOpen: false }} title="Minute-by-minute breakdown" icon="th-list">
-          <SectionCard padded={false}>
-            <HTMLTable compact interactive className="contrib-table">
-              <thead>
-                <tr><th>Cause</th><th>At</th><th>When</th><th>Started on</th><th className="num">Min</th></tr>
-              </thead>
-              <tbody>
-                {contribs.slice(0, 10).map((c, k) => {
-                  const cat = CAT_META[CATS[c[0]]]
-                  return (
-                    <tr key={k} onClick={() => c[2] >= 0 && onSelect(c[2])}>
-                      <td><CatLabel icon={cat.icon}>{cat.short}</CatLabel></td>
-                      <td><strong>{day.airports[c[1]]?.code ?? '?'}</strong></td>
-                      <td className="nowrap">{clock(c[3])}</td>
-                      <td className="nowrap">{c[4] === 0 ? 'This flight' : <>{c[2] >= 0 ? flightLabel(day, c[2]) : '?'} <span className={Classes.TEXT_MUTED}>({c[4]} back)</span></>}</td>
-                      <td className="num">{c[5]}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </HTMLTable>
-          </SectionCard>
-        </Section>
-      )}
+      <SideSection title="Event log">
+        <ol className="events">
+          {events.map((e, k) => (
+            <li key={k} className={e.intent ? `ev-${e.intent}` : ''}>
+              <Icon icon={e.icon} size={14} />
+              <span className="ev-text">{e.text}</span>
+              <span className="ev-time">{e.t != null ? t24(e.t) : ''}</span>
+            </li>
+          ))}
+        </ol>
+      </SideSection>
     </div>
   )
 }
 
-/** "Thunderstorms 1p–9p ET" style summary of the weather on record at an airport, or null. */
-function weatherEvidence(wx: ([number, number, number, string] | null)[] | undefined): string | null {
-  if (!wx) return null
-  const ts = wx.map((x, h) => (x?.[0] ? h : -1)).filter((h) => h >= 0)
-  const ifr = wx.map((x, h) => (x?.[1] ? h : -1)).filter((h) => h >= 0)
-  const range = (hs: number[]) => `${hourLabel(hs[0])}–${hourLabel(hs[hs.length - 1] + 1)} ET`
-  if (ts.length) return `thunderstorms on record ${range(ts)}`
-  if (ifr.length) return `low ceilings or visibility on record ${range(ifr)}`
-  return 'no adverse weather on record'
-}
-
-export function RippleChain({ day, chain, selected, roots, onSelect }: {
-  day: Day; chain: number[]; selected: number; roots: Set<number>; onSelect: (i: number) => void
-}) {
-  const f = day.flights
-  const max = Math.max(15, ...chain.map((i) => f.arrDelay[i] ?? 0))
+function SideSection({ title, right, children }: { title: string; right?: string; children: React.ReactNode }) {
   return (
-    <ol className="chain">
-      {chain.map((i, n) => {
-        const arr = f.arrDelay[i]
-        const by = decodedByCat(f.decoded[i].filter((c) => c[4] === 0))
-        const inh = decodedByCat(f.decoded[i].filter((c) => c[4] > 0))
-        const cancelled = f.status[i].startsWith('C')
-        const linked = n > 0 && f.prev[i] === chain[n - 1]
-        return (
-          <li key={i} className={`${i === selected ? 'sel' : ''}${linked ? '' : ' break'}`}>
-            <button onClick={() => onSelect(i)}>
-              <span className="chain-time">{clock(f.sdep[i])}</span>
-              <span className="chain-route">
-                {route(day, i)} <small>{flightLabel(day, i)}</small>
-                {roots.has(i) && <Tag minimal intent="primary" className="badge">delay started here</Tag>}
-              </span>
-              <span className="chain-delay">{cancelled ? <Tag minimal intent="danger">Cancelled</Tag> : arr == null ? '—' : arr >= 15 ? `+${dur(arr)}` : 'On time'}</span>
-              <span className="chain-bar">
-                {sum(inh) > 0 && <span className="inherited" style={{ width: `${(100 * sum(inh)) / max}%` }} title={`${dur(sum(inh))} inherited`} />}
-                {sum(by) > 0 && <span className="own" style={{ width: `${(100 * sum(by)) / max}%` }} title={`${dur(sum(by))} started on this flight`} />}
-              </span>
-            </button>
-          </li>
-        )
-      })}
-    </ol>
+    <section className="side-section">
+      <header><span>{title}</span>{right && <span className="side-right">{right}</span>}</header>
+      <div className="side-body">{children}</div>
+    </section>
   )
 }
 
-export function Stat({ label, value, sub, color }: { label: string; value: string; sub?: string; color?: string }) {
+interface Ev { t: number | null; icon: IconName; text: React.ReactNode; intent?: 'warning' | 'danger' | 'success' }
+
+/** The selected flight's story as a log: inbound aircraft, weather on record, departure, arrival. */
+function buildEvents(day: Day, i: number): Ev[] {
+  const f = day.flights
+  const o = day.airports[f.o[i]].code, d = day.airports[f.d[i]].code
+  const out: Ev[] = []
+  const p = f.prev[i]
+  if (p != null) {
+    const late = f.arrDelay[p] ?? 0
+    out.push({
+      t: actualArr(day, p), icon: 'history', intent: late >= 15 ? 'warning' : undefined,
+      text: <>Inbound {flightLabel(day, p)} from {day.airports[f.o[p]].code} {late >= 15 ? <>landed <b>+{dur(late)}</b> late</> : 'landed on time'}</>,
+    })
+  }
+  out.push({ t: f.sdep[i], icon: 'time', text: <>Scheduled to depart {o}</> })
+  for (const [code, end] of [[o, 'origin'], [d, 'destination']] as const) {
+    const ts = day.weather[code]?.map((x, h) => (x?.[0] ? h : -1)).filter((h) => h >= 0) ?? []
+    if (ts.length) out.push({ t: ts[0] * 60, icon: 'cloud', intent: 'warning', text: <>Thunderstorms at {code} ({end}), {hourLabel(ts[0])}–{hourLabel(ts[ts.length - 1] + 1)} ET</> })
+  }
+  if (f.status[i].startsWith('C')) {
+    out.push({ t: f.sdep[i], icon: 'cross', intent: 'danger', text: <>Cancelled: airline cited {CANCEL[f.status[i].slice(1)] ?? 'no cause'}</> })
+  } else {
+    const dd = f.depDelay[i] ?? 0, ad = f.arrDelay[i] ?? 0
+    out.push({ t: actualDep(day, i), icon: 'arrow-right', intent: dd >= 15 ? 'warning' : undefined, text: <>Departed {o}{dd >= 15 && <> <b>+{dur(dd)}</b></>}</> })
+    out.push({ t: actualArr(day, i), icon: 'tick-circle', intent: ad >= 15 ? 'warning' : 'success', text: <>Arrived {d}{ad >= 15 ? <> <b>+{dur(ad)}</b> late</> : ' on time'}</> })
+  }
+  return out.sort((a, b) => (a.t ?? 0) - (b.t ?? 0))
+}
+
+// ------------------------------------------------------------------ shared
+
+/** One aircraft's flights as selectable rows with a status tag each. */
+export function RippleChain({ day, chain, selected, onSelect }: {
+  day: Day; chain: number[]; selected: number; roots?: Set<number>; onSelect: (i: number) => void
+}) {
+  const f = day.flights
+  return (
+    <ul className="rows">
+      {chain.map((i) => (
+        <li key={i}>
+          <button className={`row${i === selected ? ' selected' : ''}`} onClick={() => onSelect(i)}>
+            <Icon icon="airplane" size={14} />
+            <span className="row-main">
+              <b>{flightLabel(day, i)}</b>
+              <span>{route(day, i)} · {clock24(f.sdep[i])}{dayOffset(f.sdep[i]) && <sup>{dayOffset(f.sdep[i])}</sup>}</span>
+            </span>
+            {statusTag(day, i)}
+          </button>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card compact className="stat">
       <span className="stat-label">{label}</span>
-      <span className="stat-value" style={color ? { color } : undefined}>{value}</span>
-      {sub && <span className={`stat-sub ${Classes.TEXT_MUTED}`}>{sub}</span>}
+      <span className="stat-value">{value}</span>
     </Card>
   )
-}
-
-function topCat(cs: { 0: number; 5: number }[]) {
-  const by = CATS.map(() => 0)
-  for (const c of cs) by[c[0]] += c[5]
-  return CAT_META[CATS[by.indexOf(Math.max(...by))]].label.toLowerCase()
 }

@@ -122,7 +122,10 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
           <Tooltip content="Next departure or arrival" placement="top"><Button variant="minimal" size="small" icon="chevron-right" onClick={nextEvent} aria-label="Next event" /></Tooltip>
           <Tooltip content="Forward 15 min" placement="top"><Button variant="minimal" size="small" icon="redo" text="15m" onClick={() => onTime(clamp(time + 15))} /></Tooltip>
           <Tooltip content="Faster" placement="top"><Button variant="minimal" size="small" rightIcon="fast-forward" text={`${SPEEDS[Math.min(SPEEDS.length - 1, si + 1)]}x`} disabled={si >= SPEEDS.length - 1} onClick={() => onSpeed(SPEEDS[si + 1])} /></Tooltip>
-          <Tag minimal className="scrub-tag">Archived · {speed}x</Tag>
+        </div>
+        <div className="scrub-meta">
+          <Tag minimal className="scrub-tag">ARCHIVED</Tag>
+          <span className="scrub-speed">{speed}x</span>
         </div>
       </div>
 

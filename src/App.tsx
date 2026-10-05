@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  Alignment, Breadcrumbs, Callout, Classes, Code, H4, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
-  NonIdealState, Spinner, Tag, type BreadcrumbProps,
+  Alignment, Callout, Classes, Code, H4, Icon, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
+  NonIdealState, Spinner, Tag,
 } from '@blueprintjs/core'
 import { flightLabel, loadDay, loadSummary, route, type Day, type Summary } from './data'
 import { prettyDate } from './theme'
@@ -16,6 +16,7 @@ export default function App() {
   const [date, setDate] = useState<string | null>(null)
   const [day, setDay] = useState<Day | null>(null)
   const [view, setView] = useState<View>({ kind: 'home' })
+  const [lastFlight, setLastFlight] = useState<number | null>(null)
 
   useEffect(() => {
     document.body.classList.add(Classes.DARK)
@@ -39,6 +40,7 @@ export default function App() {
     if (!date) return
     setDay(null)
     setView({ kind: 'home' })
+    setLastFlight(null)
     loadDay(date).then(setDay)
   }, [date])
 
@@ -47,6 +49,7 @@ export default function App() {
 
   const openFlight = (i: number) => {
     try { history.pushState({ flight: i }, '', '#flight') } catch { /* sandboxed frames may refuse */ }
+    setLastFlight(i)
     setView({ kind: 'flight', index: i })
   }
   const goHome = () => {
@@ -54,10 +57,8 @@ export default function App() {
     setView({ kind: 'home' })
   }
 
-  const crumbs: BreadcrumbProps[] = [{ text: 'Biggest delays', icon: 'th-list', onClick: goHome }]
-  if (view.kind === 'flight' && day) {
-    crumbs.push({ text: `${flightLabel(day, view.index)} · ${route(day, view.index)}`, icon: 'airplane', current: true })
-  }
+  // Workspace tabs, as in Palantir apps: the delays table, plus the flight that's open.
+  const [flightTab, setFlightTab] = [lastFlight, setLastFlight]
 
   return (
     <div className="app">
@@ -65,7 +66,21 @@ export default function App() {
         <NavbarGroup align={Alignment.START}>
           <NavbarHeading>Decode Delays</NavbarHeading>
           <NavbarDivider />
-          <Breadcrumbs items={crumbs} />
+          <div className="tabs" role="tablist">
+            <button role="tab" aria-selected={view.kind === 'home'} className={`ws-tab${view.kind === 'home' ? ' on' : ''}`} onClick={goHome}>
+              <Icon icon="th-list" size={14} /> Biggest delays
+            </button>
+            {flightTab != null && day && (
+              <span role="tab" aria-selected={view.kind === 'flight'} className={`ws-tab${view.kind === 'flight' ? ' on' : ''}`}>
+                <button className="ws-tab-label" onClick={() => openFlight(flightTab)}>
+                  <Icon icon="airplane" size={14} /> {flightLabel(day, flightTab)} · {route(day, flightTab)}
+                </button>
+                <button className="ws-tab-close" aria-label="Close flight" onClick={() => { setFlightTab(null); goHome() }}>
+                  <Icon icon="small-cross" size={14} />
+                </button>
+              </span>
+            )}
+          </div>
         </NavbarGroup>
         <NavbarGroup align={Alignment.END}>
           {summary.synthetic && <Tag intent="warning" icon="warning-sign" className="synthetic-tag">Synthetic sample data</Tag>}
@@ -83,7 +98,7 @@ export default function App() {
       ) : view.kind === 'home' ? (
         <HomeView day={day} onOpenFlight={openFlight} />
       ) : (
-        <FlightView day={day} index={view.index} />
+        <FlightView day={day} index={view.index} onClose={goHome} />
       )}
     </div>
   )

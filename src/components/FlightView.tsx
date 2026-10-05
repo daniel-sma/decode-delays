@@ -7,7 +7,7 @@ import { FlightPanel } from './Panels'
 const TICK_MS = 100 // at 1x, one simulated minute per tick
 
 /** One flight's page: its aircraft's day on the map with a playback scrubber, the decode in the sidebar. */
-export default function FlightView({ day, index }: { day: Day; index: number }) {
+export default function FlightView({ day, index, onClose }: { day: Day; index: number; onClose: () => void }) {
   const [selected, setSelected] = useState(index)
   const chain = useMemo(() => tailChain(day, index), [day, index])
   const win = useMemo(() => chainWindow(day, chain), [day, chain])
@@ -56,7 +56,7 @@ export default function FlightView({ day, index }: { day: Day; index: number }) 
         <Scrubber day={day} chain={chain} win={win} time={time} playing={playing} speed={speed} onTime={setTime} onPlay={setPlaying} onSpeed={setSpeed} />
       </div>
       <aside className="panel">
-        <FlightPanel day={day} index={selected} chain={chain} onSelect={pick} />
+        <FlightPanel day={day} index={selected} chain={chain} onSelect={pick} onClose={onClose} />
       </aside>
     </main>
   )

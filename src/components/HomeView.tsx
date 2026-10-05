@@ -3,7 +3,7 @@ import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, Sec
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root } from '../data'
 import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
-import { RippleChain, Stat } from './Panels'
+import { RippleChain, Stat, statusTag } from './Panels'
 import CatLabel from './CatLabel'
 
 interface Props {
@@ -39,14 +39,14 @@ export default function HomeView({ day, onOpenFlight }: Props) {
   const cancelled = sum(Object.values(t.cancelled))
   const singleTail = q.trim() && tails.length === 1 ? tails[0] : null
 
-  const columns = [
+  const columns: { name: string; width: number; className?: string; render: (i: number) => React.ReactNode }[] = [
     { name: 'Flight', width: 92, render: (i: number) => <strong>{flightLabel(day, i)}</strong> },
     { name: 'Tail', width: 92, render: (i: number) => <span className="mono">{f.tail[i] || '—'}</span> },
     { name: 'Route', width: 112, render: (i: number) => route(day, i) },
     { name: 'Sched. dep (ET)', width: 120, render: (i: number) => clock(f.sdep[i]) },
     {
-      name: 'Arr. delay', width: 96, className: 'num',
-      render: (i: number) => f.status[i].startsWith('C') ? <Tag minimal intent="danger">Cancelled</Tag> : (f.arrDelay[i] ?? 0) >= 15 ? <strong>+{dur(f.arrDelay[i]!)}</strong> : <span className={Classes.TEXT_MUTED}>On time</span>,
+      name: 'Status', width: 110,
+      render: (i: number) => statusTag(day, i),
     },
     {
       name: 'BTS reported', width: 148,
