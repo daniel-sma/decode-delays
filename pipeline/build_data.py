@@ -152,7 +152,7 @@ def adverse(h: dict | None) -> bool:
 # --------------------------------------------------------------------------- decode
 
 
-def build(rows, wx_fetcher, days_arg: str | None, synthetic: bool, source: str):
+def build(rows, wx_fetcher, days_arg: str | None, synthetic: bool, source: str, carrier: str | None = None):
     airports = airportsdata.load("IATA")
     tzcache: dict[str, ZoneInfo] = {}
 
@@ -165,6 +165,8 @@ def build(rows, wx_fetcher, days_arg: str | None, synthetic: bool, source: str):
     F = []  # list of flight dicts
     skipped_tz = set()
     for r in rows:
+        if carrier and r["Reporting_Airline"] != carrier:
+            continue
         o, d = r["Origin"], r["Dest"]
         if o not in airports or d not in airports:
             skipped_tz.add(o if o not in airports else d)
@@ -326,6 +328,7 @@ def build(rows, wx_fetcher, days_arg: str | None, synthetic: bool, source: str):
     summary = {
         "synthetic": synthetic,
         "source": source,
+        "carrier": carrier,
         "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "month": dates[0][:7],
         "categories": CATS,
@@ -485,19 +488,20 @@ def main():
     ap.add_argument("--zip", type=Path, help="use an already-downloaded BTS PREZIP file")
     ap.add_argument("--days", help="comma-separated YYYY-MM-DD days to export (default: the 6 most disrupted days)")
     ap.add_argument("--synthetic", action="store_true", help="use the offline synthetic fixture (NOT real data)")
+    ap.add_argument("--carrier", help="only keep this reporting carrier, e.g. WN for Southwest")
     args = ap.parse_args()
 
     if args.synthetic:
         sys.path.insert(0, str(ROOT / "pipeline"))
         from synthetic import synthetic_flights, synthetic_weather
-        build(synthetic_flights(), synthetic_weather, args.days, True, "Synthetic fixture (pipeline/synthetic.py)")
+        build(synthetic_flights(), synthetic_weather, args.days, True, "Synthetic fixture (pipeline/synthetic.py)", args.carrier)
         return
 
     zip_path = args.zip or fetch(BTS_URL.format(year=args.year, month=args.month),
                                  RAW / f"bts_{args.year}_{args.month}.zip")
-    source = (f"BTS Reporting Carrier On-Time Performance, {args.year}-{args.month:02d}; "
-              "weather: Iowa Environmental Mesonet ASOS")
-    build(read_bts(zip_path), fetch_weather, args.days, False, source)
+    source = (f"BTS Reporting Carrier On-Time Performance, {args.year}-{args.month:02d}"
+              f"{f' ({args.carrier} only)' if args.carrier else ''}; weather: Iowa Environmental Mesonet ASOS")
+    build(read_bts(zip_path), fetch_weather, args.days, False, source, args.carrier)
 
 
 if __name__ == "__main__":
