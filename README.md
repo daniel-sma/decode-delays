@@ -97,7 +97,7 @@ The look follows Palantir's operational design language (Gotham, Foundry, Apollo
 dense but aligned panels told apart by background and 1px borders rather than shadows, small uppercase section
 headers, workspace tabs in the top bar, square corners, one typeface with tabular figures for times and numbers, status shown as
 Blueprint intent tags (ON TIME, +2h 13m, CANCELLED), and causes identified by icons and labels, never colour
-alone. The flight page puts a list-style sidebar on the left and a satellite map with an ops-console playback
+alone. The flight page puts a list-style sidebar on the left and a dark map with an ops-console playback
 scrubber on the right.
 
 **Keyboard:** press `?` anywhere for the list. On the delays table, `↑`/`↓` (also from the search box) move a
@@ -105,9 +105,9 @@ highlighted row, `PgUp`/`PgDn` move a page, `Enter` opens the flight and `/` jum
 `Space` plays or pauses, `←`/`→` step 5 min (`Shift` for 15), `[`/`]` jump to the previous or next departure or
 arrival, `-`/`=` change speed, `Home` returns to the start of the day, and `↑`/`↓` step through the aircraft's flights.
 
-The map's satellite base is NASA Blue Marble (public domain), cropped to the US and reprojected to Web
-Mercator by `pipeline/make_basemap.py` and bundled at `public/basemap/conus.jpg`. Where the browser can reach
-Esri World Imagery, its sharper tiles draw on top; where it can't, the bundled image shows.
+The map is a dark vector basemap drawn by deck.gl, with no tile server: near-black water, dark land and faint
+country, coast and US state lines from Natural Earth (`world-atlas` countries at 1:50m, `us-atlas` states), plus
+quiet water-body labels. It works offline and inside sandboxed previews.
 
 | File | What it does |
 |---|---|

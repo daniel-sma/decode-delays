@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
 import { MapView, WebMercatorViewport, type MapViewState } from '@deck.gl/core'
-import { BitmapLayer, GeoJsonLayer, IconLayer, LineLayer, ScatterplotLayer, SolidPolygonLayer } from '@deck.gl/layers'
-import { TileLayer } from '@deck.gl/geo-layers'
+import { GeoJsonLayer, IconLayer, LineLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers'
 import { PathStyleExtension } from '@deck.gl/extensions'
 import { Button, ButtonGroup, Icon } from '@blueprintjs/core'
-import { feature } from 'topojson-client'
-import type { Topology } from 'topojson-specification'
+import { feature, mesh } from 'topojson-client'
+import type { GeometryCollection, Topology } from 'topojson-specification'
 import statesTopo from 'us-atlas/states-10m.json'
+// Natural Earth countries at 1:50m, emitted as its own file and fetched, so it stays out of the JS bundle.
+import worldUrl from 'world-atlas/countries-50m.json?url'
 import { flightLabel, type Day } from '../data'
 import { clock, dur } from '../theme'
 import { actualArr, actualDep } from './Scrubber'
@@ -15,15 +16,38 @@ import { actualArr, actualDep } from './Scrubber'
 const topo = statesTopo as unknown as Topology
 const states = feature(topo, topo.objects.states)
 
-// Bundled satellite image (NASA Blue Marble, see pipeline/make_basemap.py); bounds must match that script.
-const BASEMAP = `${import.meta.env.BASE_URL}basemap/world.jpg`
-const BASEMAP_BOUNDS: [number, number, number, number] = [-180, -85.0511, 180, 85.0511]
+// Dark vector basemap: near-black water (the map frame behind the canvas), dark land, faint borders and
+// water-body labels, so the routes are the brightest thing on the map.
+const LAND: RGBA = [29, 34, 41, 255]
+const COAST: RGBA = [255, 255, 255, 26]
+const BORDER: RGBA = [255, 255, 255, 46]
+const STATE: RGBA = [255, 255, 255, 22]
+const WATER_LABEL: RGBA = [255, 255, 255, 64]
+const WATER_LABELS: { text: string; at: [number, number] }[] = [
+  { text: 'North\nAtlantic\nOcean', at: [-45, 33] },
+  { text: 'North\nPacific\nOcean', at: [-142, 30] },
+  { text: 'Gulf of\nMexico', at: [-90.5, 25.3] },
+  { text: 'Caribbean Sea', at: [-75, 15] },
+  { text: 'Hudson\nBay', at: [-85.5, 59.5] },
+]
+
+interface World { land: GeoJSON.FeatureCollection; borders: GeoJSON.MultiLineString; coast: GeoJSON.MultiLineString }
+let worldCache: Promise<World> | null = null
+function loadWorld(): Promise<World> {
+  worldCache ??= fetch(worldUrl).then((r) => r.json()).then((t: Topology) => {
+    const countries = t.objects.countries as GeometryCollection
+    return {
+      land: feature(t, countries) as GeoJSON.FeatureCollection,
+      borders: mesh(t, countries, (a, b) => a !== b),
+      coast: mesh(t, countries, (a, b) => a === b),
+    }
+  })
+  return worldCache
+}
 const MIN_ZOOM = 1.6 // the whole world fills the view; no empty space past the poles
 const MAX_ZOOM = 9
 // Repeat the world horizontally so panning past the antimeridian never shows empty space.
 const VIEW = new MapView({ repeat: true })
-// Sharper imagery where the host is reachable; tiles that fail to load leave the bundled image showing.
-const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
 type RGBA = [number, number, number, number]
 // Leg colours match the sidebar's status tags: on time, 15+ min late, 3h+ late.
@@ -32,9 +56,6 @@ const LATE: RGBA = [201, 154, 85, 255] // --late
 const SEVERE: RGBA = [201, 104, 112, 255] // --severe
 const SEVERE_MIN = 180 // same threshold as statusTag
 const WHITE: RGBA = [241, 243, 245, 255] // --map-selected
-// Darkens the imagery so routes read first (the map frame colour, --map-frame).
-const SHADE: RGBA = [17, 21, 26, 120]
-const WORLD = [[[-180, -85], [180, -85], [180, 85], [-180, 85]]]
 // Map marker: the plane artwork faces east (nose right), so it turns by 90° less than the bearing.
 const PLANE = `${import.meta.env.BASE_URL}brand/plane.png`
 const PLANE_HEADING = 90
@@ -65,6 +86,8 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [view, setView] = useState<MapViewState>({ longitude: -96, latitude: 38.5, zoom: 3.6 })
   const [fitKey, setFitKey] = useState(0)
+  const [world, setWorld] = useState<World | null>(null)
+  useEffect(() => { loadWorld().then(setWorld).catch(() => {}) }, [])
 
   const legs = useMemo<Leg[]>(() => chain.map((i) => {
     const o = day.airports[f.o[i]], d = day.airports[f.d[i]]
@@ -123,17 +146,15 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const planeOnSel = plane?.leg?.i === selected
 
   const layers = [
-    new BitmapLayer({ id: 'basemap', image: BASEMAP, bounds: BASEMAP_BOUNDS }),
-    new TileLayer({
-      id: 'imagery', data: ESRI, minZoom: 0, maxZoom: 17, tileSize: 256, maxRequests: 8,
-      onTileError: () => {}, // blocked or offline: the bundled image underneath stays visible
-      renderSubLayers: (props) => {
-        const [[west, south], [east, north]] = props.tile.boundingBox
-        return new BitmapLayer(props, { data: undefined, image: props.data, bounds: [west, south, east, north], opacity: 0.8 })
-      },
+    new GeoJsonLayer({ id: 'land', data: world?.land, filled: true, stroked: false, getFillColor: LAND }),
+    new GeoJsonLayer({ id: 'coast', data: world?.coast, stroked: true, getLineColor: COAST, lineWidthUnits: 'pixels', getLineWidth: 1 }),
+    new GeoJsonLayer({ id: 'states', data: states, filled: false, stroked: true, getLineColor: STATE, lineWidthUnits: 'pixels', getLineWidth: 1 }),
+    new GeoJsonLayer({ id: 'borders', data: world?.borders, stroked: true, getLineColor: BORDER, lineWidthUnits: 'pixels', getLineWidth: 1 }),
+    new TextLayer({
+      id: 'water-labels', data: WATER_LABELS, getPosition: (d) => d.at, getText: (d) => d.text,
+      getColor: WATER_LABEL, getSize: 15, lineHeight: 1.15, fontFamily: getComputedStyle(document.body).fontFamily, fontWeight: 400,
+      characterSet: 'auto',
     }),
-    new SolidPolygonLayer({ id: 'shade', data: [WORLD], getPolygon: (p) => p, getFillColor: SHADE }),
-    new GeoJsonLayer({ id: 'states', data: states, filled: false, stroked: true, getLineColor: [255, 255, 255, 31], lineWidthMinPixels: 0.6 }),
     // Legs still to fly are dashed, like a planned route.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
       id: 'upcoming', data: upcoming, getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
@@ -246,7 +267,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
         <Button icon="zoom-out" onClick={() => setView(clampView({ ...view, zoom: view.zoom - 0.6 }))} aria-label="Zoom out" />
         <Button icon="zoom-to-fit" onClick={() => setFitKey((k) => k + 1)} aria-label="Fit route" />
       </ButtonGroup>
-      <div className="map-credit">Imagery: NASA Blue Marble · Esri, Maxar, Earthstar Geographics</div>
+      <div className="map-credit">Natural Earth</div>
     </div>
   )
 }

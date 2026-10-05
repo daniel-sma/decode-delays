@@ -15,7 +15,7 @@
       ]
     },
     {
-      "source": "/basemap/(.*)",
+      "source": "/assets/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
