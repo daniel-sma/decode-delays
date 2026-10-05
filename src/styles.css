@@ -506,3 +506,45 @@ span.ws-tab { padding: 0; }
 .map-callout-row { font-size: 12px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Pins can be hovered to open their airport's card; the rest of the overlay lets the map take the pointer */
 .map-pin { pointer-events: auto; cursor: default; }
+
+/* ---------- phones and small tablets (comes last so it wins over the desktop rules above) */
+html, body { overflow-x: hidden; }
+@media (max-width: 900px) {
+  .app { overflow-x: hidden; }
+  /* Header: one 48px row; the tabs scroll sideways instead of wrapping under the NOC mark */
+  .topbar.bp6-navbar { height: 48px; padding: 0 0 0 var(--s-4); flex-wrap: nowrap; }
+  .topbar .bp6-navbar-group { height: 48px; min-height: 0; flex-wrap: nowrap; }
+  .topbar .bp6-navbar-divider { margin: 0 var(--s-3); }
+  .ws-tab, span.ws-tab { height: 48px; padding: 0 var(--s-3); font-size: 12px; }
+  span.ws-tab { padding: 0; }
+  .ws-tab-label { padding: 0 var(--s-1) 0 var(--s-3); }
+  .ws-tab-close { width: 28px; padding-right: 4px; }
+
+  /* Home: KPIs two across, then search, then a table about a screen tall (it scrolls inside, both ways) */
+  .home { display: block; overflow-y: auto; }
+  .home-main { display: flex; padding: var(--s-3); gap: var(--s-3); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpis .stat.bp6-card { padding: var(--s-3); gap: var(--s-2); }
+  .stat-icon { width: 32px; height: 32px; }
+  .stat-text .stat-value { font-size: 18px; }
+  .home-table-section.bp6-section { flex: none !important; min-height: 0; }
+  .home-table-section .bp6-section-card[class*='padded'], .home-table-section > div:first-child { padding: var(--s-3); }
+  .home-table-section > .table-card.bp6-section-card { flex: none; height: calc(100dvh - 140px); min-height: 320px; }
+  .search-meta .bp6-button-text { display: none; } /* "Clear filters" becomes just its icon */
+
+  /* Flight page: map, then scrubber, then the sidebar; the whole page scrolls */
+  .flight-page { flex-direction: column; overflow-y: auto; }
+  .flight-stage { flex: none; overflow: visible; }
+  .map-wrap { flex: none; height: 52vh; min-height: 300px; }
+  .map-legend { left: var(--s-2); right: var(--s-2); bottom: var(--s-2); gap: 2px var(--s-3); padding: 4px var(--s-2); font-size: 11px; }
+  .map-legend i { width: 12px; }
+  .map-credit { display: none; }
+  .map-tools.bp6-button-group { top: var(--s-2); right: var(--s-2); }
+  .scrub-bar { grid-template-columns: 1fr; gap: var(--s-1); padding: var(--s-2) var(--s-3); }
+  .scrub-clock { justify-content: center; }
+  .scrub-transport { flex-wrap: nowrap; }
+  .scrub-speed-btn { display: none; } /* slower / faster: keys on desktop, not needed on a phone */
+  .scrub-play.bp6-button { min-width: 72px; }
+  .scrub-body { height: 104px; }
+  .flight-page > .panel { order: 1; width: 100%; border-right: 0; border-top: 1px solid var(--line); overflow: visible; }
+}

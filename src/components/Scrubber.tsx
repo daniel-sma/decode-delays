@@ -145,13 +145,13 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
         </div>
         <div className="scrub-transport">
           <Tooltip content="Start of day · Home" placement="top"><Button variant="minimal" size="small" icon="step-backward" onClick={() => onTime(win.t0)} aria-label="Start of day" /></Tooltip>
-          <Tooltip content="Slower · −" placement="top"><Button variant="minimal" size="small" icon="fast-backward" text={`${SPEEDS[Math.max(0, si - 1)]}x`} disabled={si <= 0} onClick={() => onSpeed(SPEEDS[si - 1])} /></Tooltip>
+          <Tooltip content="Slower · −" placement="top" targetProps={{ className: 'scrub-speed-btn' }}><Button variant="minimal" size="small" icon="fast-backward" text={`${SPEEDS[Math.max(0, si - 1)]}x`} disabled={si <= 0} onClick={() => onSpeed(SPEEDS[si - 1])} /></Tooltip>
           <Tooltip content="Back 15 min · Shift+←" placement="top"><Button variant="minimal" size="small" icon="undo" text="15m" onClick={() => onTime(clamp(time - 15))} /></Tooltip>
           <Tooltip content="Previous departure or arrival · [" placement="top"><Button variant="minimal" size="small" icon="chevron-left" onClick={prevEvent} aria-label="Previous event" /></Tooltip>
           <Button intent="primary" size="small" icon={playing ? 'pause' : 'play'} text={playing ? 'Pause' : 'Play'} className="scrub-play" onClick={togglePlay} title="Play / pause · Space" />
           <Tooltip content="Next departure or arrival · ]" placement="top"><Button variant="minimal" size="small" icon="chevron-right" onClick={nextEvent} aria-label="Next event" /></Tooltip>
           <Tooltip content="Forward 15 min · Shift+→" placement="top"><Button variant="minimal" size="small" icon="redo" text="15m" onClick={() => onTime(clamp(time + 15))} /></Tooltip>
-          <Tooltip content="Faster · =" placement="top"><Button variant="minimal" size="small" rightIcon="fast-forward" text={`${SPEEDS[Math.min(SPEEDS.length - 1, si + 1)]}x`} disabled={si >= SPEEDS.length - 1} onClick={() => onSpeed(SPEEDS[si + 1])} /></Tooltip>
+          <Tooltip content="Faster · =" placement="top" targetProps={{ className: 'scrub-speed-btn' }}><Button variant="minimal" size="small" rightIcon="fast-forward" text={`${SPEEDS[Math.min(SPEEDS.length - 1, si + 1)]}x`} disabled={si >= SPEEDS.length - 1} onClick={() => onSpeed(SPEEDS[si + 1])} /></Tooltip>
         </div>
         <div className="scrub-meta">
           <span className="scrub-speed">{speed}x</span>

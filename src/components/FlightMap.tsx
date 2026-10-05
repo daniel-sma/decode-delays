@@ -140,6 +140,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const [fitKey, setFitKey] = useState(0)
   const [world, setWorld] = useState<World | null>(null)
   const [hoverAp, setHoverAp] = useState<number | null>(null) // airport under the pointer
+  const [tapAp, setTapAp] = useState<number | null>(null) // airport whose pin was tapped (touch screens have no hover)
   useEffect(() => { loadWorld().then(setWorld).catch(() => {}) }, [])
 
   const legs = useMemo<Leg[]>(() => chain.map((i) => {
@@ -200,7 +201,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
 
   const s = { o: f.o[selected], d: f.d[selected] }
   // Cards for the selected leg's airports show only while hovered.
-  const cardAps = [s.o, s.d].filter((ap) => ap === hoverAp)
+  const cardAps = [s.o, s.d].filter((ap) => ap === hoverAp || ap === tapAp)
   const labels = useMemo(() => {
     if (!viewport) return []
     // Pins first (an icon tile whose tail points at the airport), then every airport code, then any open card;
@@ -343,7 +344,12 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
         controller={{ dragRotate: false, touchRotate: false }}
         layers={layers}
         getCursor={({ isHovering }) => (isHovering ? 'pointer' : 'grab')}
-        onClick={(info) => info.layer?.id === 'flown' && info.object && onSelect((info.object as Leg).i)}
+        onClick={(info) => {
+          // Tapping an airport dot toggles its card (no hover on touch screens); tapping elsewhere closes it.
+          const ap = info.layer?.id === 'airports' ? (info.object as number) : null
+          setTapAp((t) => (ap != null && t !== ap ? ap : null))
+          if (info.layer?.id === 'flown' && info.object) onSelect((info.object as Leg).i)
+        }}
         getTooltip={(info) => info.layer?.id === 'flown' && info.object ? {
           html: `<div class="tt-title">${flightLabel(day, (info.object as Leg).i)}</div>`,
           className: 'tooltip', style: { background: 'none', padding: '0' },
@@ -356,7 +362,8 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
           return (
             <span
               key={`pin-${ap}`} className={`map-pin${cardAps.includes(ap) ? ' on' : ''}`} style={{ left: x - PIN / 2, top: y - PIN - PIN_TAIL }}
-              onPointerEnter={() => setHoverAp(ap)} onPointerLeave={() => setHoverAp(null)}
+              onPointerEnter={(e) => e.pointerType !== 'touch' && setHoverAp(ap)} onPointerLeave={() => setHoverAp(null)}
+              onClick={() => setTapAp((t) => (t === ap ? null : ap))}
             >
               <Icon icon={ap === s.o ? 'map-marker' : 'flag'} size={14} />
             </span>
