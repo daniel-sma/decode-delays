@@ -1,4 +1,7 @@
-# Decode Delays
+# DeTrace
+
+> Concept work: a Southwest Airlines operations tool for tracing delays to their root cause. Not affiliated
+> with or endorsed by Southwest Airlines; the logo is used for a portfolio mock-up only.
 
 **Where US flight delays actually started.**
 
@@ -19,12 +22,19 @@ npm run dev                # http://localhost:5173, using the real data committe
 
 `public/data/` holds real data: BTS Reporting Carrier On-Time Performance for **July 2026** (the latest
 month released, published Sept 21, 2026; 631,970 flights) and hourly ASOS/METAR weather for the 44 busiest
-airports from the Iowa Environmental Mesonet. It covers the six most disrupted days of the month.
+airports from the Iowa Environmental Mesonet. It is filtered to Southwest Airlines (`WN`, 124,994 flights, 792 aircraft) and covers Southwest's six most
+disrupted days of the month.
+
+### Delay cost
+
+Costs use Airlines for America's 2025 average direct aircraft operating cost of **$98.41 per block minute**
+(crew, fuel, maintenance, ownership; from DOT Form 41), applied to delay minutes. Cancellations and passenger
+costs are not included. A flight's page also shows the cost it passed on to later flights of the same aircraft.
 
 ### Rebuilding the data
 
 The **Build real data** GitHub Actions workflow (`.github/workflows/build-data.yml`) downloads the sources,
-runs the pipeline and commits `public/data/`. It runs whenever the pipeline changes, or manually from the
+runs the pipeline (Southwest only by default, `--carrier WN`) and commits `public/data/`. It runs whenever the pipeline changes, or manually from the
 Actions tab, where you can pick another year, month or specific days.
 
 To build locally instead:
@@ -93,7 +103,8 @@ Esri World Imagery, its sharper tiles draw on top; where it can't, the bundled i
 |---|---|
 | `src/App.tsx` | Navbar with workspace tabs (delays table, open flight) and the calendar date picker |
 | `src/components/DayPicker.tsx` | Month calendar in a popover. Only days with exported data can be picked; others explain why |
-| `src/components/HomeView.tsx` | **Home:** KPI tiles, a root-cause grid whose cause and airport chips filter the table, tail-number search above a `Table2` of the biggest delays |
+| `src/components/HomeView.tsx` | **Home:** delay-cost KPI tiles, tail/flight search, and a `Table2` of the biggest delays filtered from its column headers |
+| `src/components/HeaderMenus.tsx` | Blueprint `Menu`s used as column-header filters (status, airport, root cause and where it started) |
 | `src/components/FlightView.tsx` | **Flight page:** map + scrubber + sidebar, sharing one clock. The sidebar follows the leg in the air at the playhead |
 | `src/components/FlightMap.tsx` | deck.gl map of one tail's legs (flown legs by root cause, unflown faint, selected white), the plane's position at the playhead, airport chips and detail cards |
 | `src/components/Scrubber.tsx` | Playback: clock, transport controls (start, slower, −15m, previous event, play, next event, +15m, faster), hour ruler, leg spans, and a histogram of how late the plane is running, coloured by root cause |

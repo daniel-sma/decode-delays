@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Button, Card, Classes, Icon, Tag, type Intent } from '@blueprintjs/core'
 import type { IconName } from '@blueprintjs/icons'
 import { CATS, REPORTED, flightLabel, route, sum, type Day } from '../data'
-import { CAT_META, REPORTED_META, dur, hourLabel, pct } from '../theme'
+import { CAT_META, COST_PER_MIN, REPORTED_META, dur, hourLabel, money, pct } from '../theme'
 import { actualArr, actualDep, clock24, dayOffset } from './Scrubber'
 
 const CANCEL = { A: 'carrier', B: 'weather', C: 'NAS', D: 'security' } as Record<string, string>
@@ -47,6 +47,19 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
   const reported = f.causes[index]
 
   const events = useMemo(() => buildEvents(day, index), [day, index])
+
+  // Cost: this flight's own arrival delay, plus delay it handed to later flights (contributions whose root is it).
+  const knockOn = useMemo(() => {
+    let min = 0
+    const hit = new Set<number>()
+    f.decoded.forEach((cs, k) => {
+      if (k === index) return
+      for (const c of cs) if (c[2] === index && c[4] > 0) { min += c[5]; hit.add(k) }
+    })
+    return { min, flights: hit.size }
+  }, [f, index])
+  const ownMin = (f.arrDelay[index] ?? 0) >= 15 ? f.arrDelay[index]! : 0
+  const byCat = CATS.map((_, c) => sum(f.decoded[index].filter((x) => x[0] === c).map((x) => x[5]))).map((m, c) => ({ c, m })).filter((x) => x.m > 0).sort((a, b) => b.m - a.m)
 
   return (
     <div className="side">
@@ -112,6 +125,46 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
 
       <SideSection title={`Aircraft ${f.tail[index] || ''}`} right={`${chain.length} flights`}>
         <RippleChain day={day} chain={chain} selected={index} onSelect={onSelect} />
+      </SideSection>
+
+      <SideSection title="Cost" right={ownMin + knockOn.min ? money((ownMin + knockOn.min) * COST_PER_MIN, true) : undefined}>
+        {ownMin === 0 && knockOn.min === 0 ? (
+          <div className="row info-row">
+            <Icon icon="info-sign" size={14} />
+            <span className="row-main"><b>No delay cost</b><span>{cancelled ? 'Cancellation costs aren’t estimated' : 'Arrived under 15 min late'}</span></span>
+          </div>
+        ) : (
+          <ul className="rows">
+            {ownMin > 0 && (
+              <li>
+                <div className="row static">
+                  <Icon icon="dollar" size={14} />
+                  <span className="row-main"><b>This flight’s delay</b><span>{dur(ownMin)} late on arrival</span></span>
+                  <span className="row-num">{money(ownMin * COST_PER_MIN, true)}</span>
+                </div>
+              </li>
+            )}
+            {byCat.map(({ c, m }) => (
+              <li key={c}>
+                <div className="row static sub">
+                  <Icon icon={CAT_META[CATS[c]].icon} size={14} />
+                  <span className="row-main"><span>{CAT_META[CATS[c]].label}</span></span>
+                  <span className="row-num">{money(m * COST_PER_MIN, true)}</span>
+                </div>
+              </li>
+            ))}
+            {knockOn.min > 0 && (
+              <li>
+                <div className="row static">
+                  <Icon icon="flows" size={14} />
+                  <span className="row-main"><b>Passed to later flights</b><span>{dur(knockOn.min)} across {knockOn.flights} flight{knockOn.flights === 1 ? '' : 's'}</span></span>
+                  <span className="row-num">{money(knockOn.min * COST_PER_MIN, true)}</span>
+                </div>
+              </li>
+            )}
+          </ul>
+        )}
+        <p className="side-note">At $98.41 per delay minute (Airlines for America, 2025).</p>
       </SideSection>
 
       <SideSection title="Event log">

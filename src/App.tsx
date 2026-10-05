@@ -65,7 +65,10 @@ export default function App() {
     <div className="app">
       <Navbar className="topbar">
         <NavbarGroup align={Alignment.START} className="topbar-left">
-          <NavbarHeading>Decode Delays</NavbarHeading>
+          <NavbarHeading className="brand">
+            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={22} height={22} />
+            <span>DeTrace</span>
+          </NavbarHeading>
           <NavbarDivider />
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={active == null} className={`ws-tab${active == null ? ' on' : ''}`} onClick={() => setActive(null)}>
@@ -85,6 +88,7 @@ export default function App() {
         </NavbarGroup>
         <NavbarGroup align={Alignment.END}>
           {summary.synthetic && <Tag intent="warning" icon="warning-sign" className="synthetic-tag">Synthetic sample data</Tag>}
+          <span className="concept-note">Concept · not affiliated with Southwest Airlines</span>
           {date && <DayPicker summary={summary} value={date} onChange={setDate} />}
         </NavbarGroup>
       </Navbar>

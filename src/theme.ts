@@ -80,3 +80,15 @@ export function prettyDate(iso: string) {
     weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC',
   })
 }
+
+// Delay cost: Airlines for America's average direct aircraft operating cost per block minute for U.S.
+// passenger airlines in 2025 (crew, fuel, maintenance, ownership, other; from DOT Form 41).
+export const COST_PER_MIN = 98.41
+export const COST_NOTE = 'Estimated at $98.41 per delay minute, the 2025 average direct operating cost per block minute for U.S. airlines (Airlines for America). Excludes cancellations and passenger costs.'
+
+/** $56.0M / $412K / $9,840 */
+export function money(n: number, exact = false) {
+  if (exact || Math.abs(n) < 10_000) return `$${Math.round(n).toLocaleString('en-US')}`
+  if (Math.abs(n) >= 1e6) return `$${(n / 1e6).toFixed(n >= 1e8 ? 0 : 1)}M`
+  return `$${Math.round(n / 1e3).toLocaleString('en-US')}K`
+}

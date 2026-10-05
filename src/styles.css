@@ -271,15 +271,20 @@ span.ws-tab { padding: 0; }
   .synthetic-tag { display: none; }
 }
 
-/* ---------- table filters: one Blueprint ButtonGroup of default buttons */
-.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin-top: var(--s-3); }
-.filter-group.bp6-button-group { flex-wrap: wrap; }
-.filter-btn.bp6-button { font-size: 13px; }
-.filter-btn.active { font-weight: 600; }
-.bp6-dark .filter-btn.active > .bp6-icon:first-child { color: var(--accent-hi); }
-.filter-count { margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
-.bp6-select-popover .bp6-menu { max-height: 320px; overflow-y: auto; min-width: 200px; }
-.bp6-select-popover .bp6-menu-item-label { font-family: var(--mono); color: var(--ink-3); }
+/* ---------- table filters live in the column headers (Blueprint Table2 header menus) */
+.table-meta { display: inline-flex; align-items: center; gap: var(--s-2); }
+.filter-count { font-family: var(--mono); font-size: 12px; color: var(--ink-3); }
+/* Filterable columns always show their filter button; an active filter is blue. */
+.bp6-table-header.has-filter .bp6-table-th-menu-container { opacity: 1 !important; }
+.bp6-table-header.has-filter .bp6-table-th-menu-container .bp6-icon { color: var(--ink-3); }
+.bp6-table-header.filtered { box-shadow: inset 0 -2px 0 var(--accent-hi), inset -1px 0 0 var(--line) !important; }
+.bp6-table-header.filtered .bp6-table-th-menu-container .bp6-icon,
+.bp6-table-header.filtered .bp6-table-column-name-text { color: var(--accent-hi) !important; }
+.th-name { display: inline-flex; align-items: center; gap: 6px; }
+.th-filter-on { color: var(--accent-hi); }
+.header-menu.bp6-menu { min-width: 220px; max-height: 380px; overflow-y: auto; }
+.header-menu .bp6-menu-item-label { font-family: var(--mono); color: var(--ink-3); }
+.menu-search { list-style: none; padding: 4px 6px 6px; }
 
 /* root cause: "no cause recorded" uses the same row box */
 .row.info-row { cursor: default; grid-template-columns: 16px minmax(0, 1fr); }
@@ -292,3 +297,19 @@ span.ws-tab { padding: 0; }
 .ws-tab, span.ws-tab { flex-shrink: 0; white-space: nowrap; }
 .topbar.bp6-navbar { display: flex; align-items: center; gap: var(--s-3); }
 .topbar .bp6-navbar-group { float: none; }
+
+/* ---------- brand */
+.brand.bp6-navbar-heading { display: inline-flex; align-items: center; gap: var(--s-2); font-size: 15px; font-weight: 700; letter-spacing: 0.01em; }
+.brand img { display: block; }
+.concept-note { font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+
+/* KPI strip note */
+.kpi-block { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.kpi-note { margin: 0; font-size: 11px; color: var(--ink-3); }
+
+/* cost rows in the flight sidebar */
+.row.static { cursor: default; grid-template-columns: 16px minmax(0, 1fr) auto; }
+.row.static.sub { min-height: 28px; background: transparent; padding-left: var(--s-5); }
+.row.static.sub .row-main span { font-family: inherit; font-size: 12px; color: var(--ink-2); }
+.row.static .row-num { color: var(--ink-1); }
+@media (max-width: 1200px) { .concept-note { display: none; } }

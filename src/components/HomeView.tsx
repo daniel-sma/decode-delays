@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, ButtonGroup, Callout, Classes, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
+import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
-import { CAT_META, REPORTED_META, clock, fmt, pct, prettyDate } from '../theme'
+import { CAT_META, COST_NOTE, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
 import { RippleChain, Stat, statusTag } from './Panels'
 import CatLabel from './CatLabel'
-import FilterSelect from './FilterSelect'
+import { RootCauseMenu, SearchFilterMenu, SimpleFilterMenu, type Choice } from './HeaderMenus'
 
 interface Props {
   day: Day
@@ -13,11 +13,25 @@ interface Props {
 }
 
 type Status = 'delayed' | 'severe' | 'ontime' | 'cancelled' | 'all'
-interface Filter { cat: number | null; airport: number | null; status: Status; carrier: string | null; at: number | null }
-const NO_FILTER: Filter = { cat: null, airport: null, status: 'delayed', carrier: null, at: null }
+interface Filter { cat: number | null; airport: number | null; status: Status; at: number | null }
+const NO_FILTER: Filter = { cat: null, airport: null, status: 'delayed', at: null }
+const STATUS: Choice<Status>[] = [
+  { value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' },
+  { value: 'cancelled', label: 'Cancelled' }, { value: 'ontime', label: 'On time' }, { value: 'all', label: 'All flights' },
+]
 
 // Width reserved for the table's vertical scrollbar so columns never overflow sideways.
 const SCROLLBAR = 16
+
+interface Col {
+  name: string
+  width: number
+  className?: string
+  render: (i: number) => React.ReactNode
+  /** Blueprint header menu used as this column's filter */
+  menu?: () => React.JSX.Element
+  filtered?: boolean
+}
 
 export default function HomeView({ day, onOpenFlight }: Props) {
   const [q, setQ] = useState('')
@@ -34,7 +48,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       if (f.otherDay[i]) continue
       if (query) {
         const label = f.carrier[i] + f.fn[i]
-        if (!(f.tail[i].toUpperCase().startsWith(query) || label === query || (query.length >= 3 && label.startsWith(query)))) continue
+        if (!(f.tail[i].toUpperCase().startsWith(query) || label === query || f.fn[i] === query || (query.length >= 3 && label.startsWith(query)))) continue
       }
       const a = f.arrDelay[i] ?? 0, c = f.status[i].startsWith('C')
       // A search shows every matching flight unless a status is chosen explicitly.
@@ -43,7 +57,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       if (status === 'severe' && (c || a < 180)) continue
       if (status === 'ontime' && (c || a >= 15)) continue
       if (status === 'cancelled' && !c) continue
-      if (filter.carrier && f.carrier[i] !== filter.carrier) continue
       if (filter.at != null && f.o[i] !== filter.at && f.d[i] !== filter.at) continue
       const r = roots[i]
       if (filter.cat != null && r?.cat !== filter.cat) continue
@@ -57,7 +70,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     return { rows: out, tails }
   }, [f, query, filter, roots])
 
-  const carriers = useMemo(() => countBy(f.carrier.filter((_, i) => !f.otherDay[i])), [f])
   const airportsUsed = useMemo(() => {
     const m = new Map<number, number>()
     f.o.forEach((o, i) => { if (!f.otherDay[i]) { m.set(o, (m.get(o) ?? 0) + 1); m.set(f.d[i], (m.get(f.d[i]) ?? 0) + 1) } })
@@ -68,7 +80,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     roots.forEach((r) => { if (r && (filter.cat == null || r.cat === filter.cat)) m.set(r.airport, (m.get(r.airport) ?? 0) + 1) })
     return [...m].sort((a, b) => b[1] - a[1])
   }, [roots, filter.cat])
-  const filtersSet = filter.cat != null || filter.airport != null || filter.carrier != null || filter.at != null || filter.status !== 'delayed'
+  const filtersSet = filter.cat != null || filter.airport != null || filter.at != null || filter.status !== 'delayed'
 
   useEffect(() => { setFilter(NO_FILTER); setQ('') }, [day])
 
@@ -76,19 +88,33 @@ export default function HomeView({ day, onOpenFlight }: Props) {
   const delayed = useMemo(() => f.arrDelay.filter((d, i) => !f.otherDay[i] && (d ?? 0) >= 15).length, [f])
   const cancelled = sum(Object.values(t.cancelled))
   const singleTail = q.trim() && tails.length === 1 ? tails[0] : null
+  const cost = (min: number) => money(min * COST_PER_MIN)
 
-  const columns: { name: string; width: number; className?: string; render: (i: number) => React.ReactNode }[] = [
-    { name: 'Flight', width: 92, render: (i: number) => <strong>{flightLabel(day, i)}</strong> },
-    { name: 'Tail', width: 92, render: (i: number) => <span className="mono">{f.tail[i] || '—'}</span> },
-    { name: 'Route', width: 112, render: (i: number) => route(day, i) },
-    { name: 'Sched. dep (ET)', width: 120, render: (i: number) => clock(f.sdep[i]) },
+  const columns: Col[] = [
+    { name: 'Flight', width: 92, render: (i) => <strong>{flightLabel(day, i)}</strong> },
+    { name: 'Tail', width: 92, render: (i) => <span className="mono">{f.tail[i] || '—'}</span> },
     {
-      name: 'Status', width: 110,
-      render: (i: number) => statusTag(day, i),
+      name: 'Route', width: 120, render: (i) => route(day, i), filtered: filter.at != null,
+      menu: () => (
+        <SearchFilterMenu<number | null>
+          title="Airport (origin or destination)" placeholder="Search airports" value={filter.at}
+          onPick={(at) => setFilter({ ...filter, at })}
+          items={[{ value: null, label: 'Any airport' }, ...airportsUsed.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
+        />
+      ),
+    },
+    { name: 'Sched. dep (ET)', width: 120, render: (i) => clock(f.sdep[i]) },
+    {
+      name: 'Status', width: 116, render: (i) => statusTag(day, i), filtered: filter.status !== 'delayed',
+      menu: () => <SimpleFilterMenu<Status> title="Status" items={STATUS} value={filter.status} onPick={(status) => setFilter({ ...filter, status })} />,
+    },
+    {
+      name: 'Delay cost', width: 104, className: 'num',
+      render: (i) => ((f.arrDelay[i] ?? 0) >= 15 ? <span className="mono">{money((f.arrDelay[i] ?? 0) * COST_PER_MIN, true)}</span> : <span className={Classes.TEXT_MUTED}>—</span>),
     },
     {
       name: 'BTS reported', width: 148,
-      render: (i: number) => {
+      render: (i) => {
         const r = topReported(day, i)
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
         const m = REPORTED_META[r[0]]
@@ -96,17 +122,25 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       },
     },
     {
-      name: 'Decoded root cause', width: 190,
-      render: (i: number) => {
+      name: 'Decoded root cause', width: 190, filtered: filter.cat != null || filter.airport != null,
+      render: (i) => {
         const r = roots[i]
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
         const c = CAT_META[CATS[r.cat]]
         return <CatLabel icon={c.icon}>{c.short} at <strong>{day.airports[r.airport]?.code ?? '?'}</strong> <span className={Classes.TEXT_MUTED}>{pct(r.share, 1)}</span></CatLabel>
       },
+      menu: () => (
+        <RootCauseMenu<number | null, number | null>
+          causes={[{ value: null, label: 'Any root cause' }, ...CATS.map((c, k) => ({ value: k, label: CAT_META[c].label, icon: CAT_META[c].icon }))]}
+          cause={filter.cat} onCause={(cat) => setFilter({ ...filter, cat, airport: null })}
+          airports={[{ value: null, label: 'Anywhere' }, ...rootAirports.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
+          airport={filter.airport} onAirport={(airport) => setFilter({ ...filter, airport })}
+        />
+      ),
     },
     {
-      name: 'Started', width: 132,
-      render: (i: number) => {
+      name: 'Started', width: 124,
+      render: (i) => {
         const r = roots[i]
         if (!r) return ''
         if (CATS[r.cat] === 'untraced') return <span className={Classes.TEXT_MUTED}>Can’t trace</span>
@@ -134,79 +168,52 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     if (row != null && rows[row] != null) onOpenFlight(rows[row])
   }
 
-
   return (
     <div className="home">
       <div className="home-main">
-        <div className="kpis">
-          <Stat label="Flights scheduled" value={fmt(t.flights)} />
-          <Stat label="Arrived 15+ min late" value={fmt(delayed)} />
-          <Stat label="Cancelled" value={fmt(cancelled)} />
-          <Stat label="Delay minutes" value={fmt(repTotal)} />
-          <Stat label="Filed as late aircraft" value={pct(t.reported.late, repTotal)} />
-          <Stat label="Traced to weather" value={pct(t.decoded.weather, repTotal)} />
+        <div className="kpi-block">
+          <div className="kpis">
+            <Stat label="Est. delay cost" value={cost(repTotal)} />
+            <Stat label="Hidden as “late aircraft”" value={cost(t.reported.late)} />
+            <Stat label="Traced to weather" value={cost(t.decoded.weather)} />
+            <Stat label="Airline-controllable" value={cost(t.decoded.airline)} />
+            <Stat label="Flights delayed 15+ min" value={fmt(delayed)} />
+            <Stat label="Cancelled" value={fmt(cancelled)} />
+          </div>
+          <p className="kpi-note">{COST_NOTE}</p>
         </div>
-
 
         <Section
           className="home-table-section"
           title={singleTail ? `Tail ${singleTail}` : q.trim() ? `Flights matching “${q.trim()}”` : 'Biggest delays'}
-          subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : 'Open a flight to see its plane’s day on the map.'}
+          subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : 'Open a flight to see its plane’s day on the map. Filter from the column headers.'}
           icon={singleTail ? 'airplane' : 'th-list'}
+          rightElement={
+            <span className="table-meta">
+              {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
+              <span className="filter-count">{fmt(rows.length)} {rows.length === 1 ? 'flight' : 'flights'}</span>
+            </span>
+          }
         >
           <SectionCard padded>
             <InputGroup
               size="large"
               leftIcon="search"
-              placeholder="Search a tail number or a flight number, e.g. AA 2671 or N102UW"
+              placeholder="Search a tail number or a flight number, e.g. WN 4067 or N7740A"
               value={q}
               onValueChange={(v) => { setQ(v); setSelected([]) }}
               rightElement={q ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} /> : undefined}
               spellCheck={false}
             />
-            <div className="filter-bar">
-              <ButtonGroup className="filter-group">
-                <FilterSelect<Status>
-                  label="Status" icon="time" value={filter.status} isDefault={filter.status === 'delayed'}
-                  onChange={(status) => setFilter({ ...filter, status })}
-                  options={[
-                    { value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' },
-                    { value: 'cancelled', label: 'Cancelled' }, { value: 'ontime', label: 'On time' }, { value: 'all', label: 'All flights' },
-                  ]}
-                />
-                <FilterSelect<string | null>
-                  label="Airline" icon="airplane" value={filter.carrier} isDefault={filter.carrier == null} searchable
-                  onChange={(carrier) => setFilter({ ...filter, carrier })}
-                  options={[{ value: null, label: 'Any airline' }, ...carriers.map(([c, n]) => ({ value: c, label: c, count: n }))]}
-                />
-                <FilterSelect<number | null>
-                  label="Root cause" icon="diagnosis" value={filter.cat} isDefault={filter.cat == null}
-                  onChange={(cat) => setFilter({ ...filter, cat, airport: null })}
-                  options={[{ value: null, label: 'Any root cause' }, ...CATS.map((c, k) => ({ value: k, label: CAT_META[c].label, icon: CAT_META[c].icon }))]}
-                />
-                <FilterSelect<number | null>
-                  label="Delay started at" icon="map-marker" value={filter.airport} isDefault={filter.airport == null} searchable
-                  onChange={(airport) => setFilter({ ...filter, airport })}
-                  options={[{ value: null, label: 'Started anywhere' }, ...rootAirports.map(([a, n]) => ({ value: a, label: `Started at ${day.airports[a].code}`, count: n }))]}
-                />
-                <FilterSelect<number | null>
-                  label="Airport (origin or destination)" icon="locate" value={filter.at} isDefault={filter.at == null} searchable
-                  onChange={(at) => setFilter({ ...filter, at })}
-                  options={[{ value: null, label: 'Any airport' }, ...airportsUsed.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
-                />
-              </ButtonGroup>
-              {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
-              <span className="filter-count">{fmt(rows.length)} {rows.length === 1 ? 'flight' : 'flights'}</span>
-            </div>
             {singleTail && rows.length > 0 && (
               <Callout className="tail-callout" icon={null} compact>
-                <RippleChain day={day} chain={tailChain(day, rows[0])} selected={-1} roots={new Set()} onSelect={onOpenFlight} />
+                <RippleChain day={day} chain={tailChain(day, rows[0])} selected={-1} onSelect={onOpenFlight} />
               </Callout>
             )}
           </SectionCard>
           <SectionCard padded={false} className="table-card" ref={cardRef}>
             {rows.length === 0 ? (
-              <NonIdealState icon="search" title="No matching flights" description={`Nothing on ${prettyDate(day.date)} matches. Tail numbers look like N411WD.`} />
+              <NonIdealState icon="search" title="No matching flights" description={`Nothing on ${prettyDate(day.date)} matches. Try clearing filters.`} />
             ) : (
               <Table2
                 key={Math.round(extra)}
@@ -219,13 +226,23 @@ export default function HomeView({ day, onOpenFlight }: Props) {
                 selectedRegions={selected}
                 onSelection={onSelection}
                 defaultRowHeight={30}
-                cellRendererDependencies={[rows]}
+                cellRendererDependencies={[rows, filter]}
               >
                 {columns.map((c) => (
                   <Column
                     key={c.name}
                     name={c.name}
-                    columnHeaderCellRenderer={() => <ColumnHeaderCell name={c.name} className={c.className} />}
+                    columnHeaderCellRenderer={() => (
+                      <ColumnHeaderCell
+                        name={c.name}
+                        className={`${c.className ?? ''}${c.menu ? ' has-filter' : ''}${c.filtered ? ' filtered' : ''}`}
+                        menuRenderer={c.menu}
+                        menuIcon={c.filtered ? 'filter-keep' : 'filter'}
+                        nameRenderer={(name) => (
+                          <span className="th-name">{name}{c.filtered && <Icon icon="filter" size={12} className="th-filter-on" />}</span>
+                        )}
+                      />
+                    )}
                     cellRenderer={(r) => <Cell className={c.className} interactive>{c.render(rows[r])}</Cell>}
                   />
                 ))}
@@ -236,10 +253,4 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       </div>
     </div>
   )
-}
-
-function countBy(xs: string[]): [string, number][] {
-  const m = new Map<string, number>()
-  for (const x of xs) m.set(x, (m.get(x) ?? 0) + 1)
-  return [...m].sort((a, b) => b[1] - a[1])
 }
