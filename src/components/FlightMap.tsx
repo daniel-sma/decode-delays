@@ -96,11 +96,11 @@ const VIEW = new MapView({ repeat: true })
 
 type RGBA = [number, number, number, number]
 // Leg colours match the sidebar's status tags: on time, 15+ min late, 3h+ late.
-const ON_TIME: RGBA = [85, 168, 121, 255] // --on-time
-const LATE: RGBA = [201, 154, 85, 255] // --late
+const ON_TIME: RGBA = [85, 168, 122, 255] // --on-time
+const LATE: RGBA = [201, 150, 85, 255] // --late
 const SEVERE: RGBA = [201, 104, 112, 255] // --severe
 const SEVERE_MIN = 180 // same threshold as statusTag
-const WHITE: RGBA = [241, 243, 245, 255] // --map-selected
+const WHITE: RGBA = [241, 241, 242, 255] // --map-selected
 // Map marker: the plane artwork faces east (nose right), so it turns by 90° less than the bearing.
 const PLANE = `${import.meta.env.BASE_URL}brand/plane.png`
 const PLANE_HEADING = 90
@@ -272,18 +272,18 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     // Legs still to fly are dashed, like a planned route.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
       id: 'upcoming', data: upcoming, getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
-      getColor: [241, 243, 245, 102], getWidth: 1.5,
+      getColor: [241, 241, 242, 102], getWidth: 1.5,
       extensions: [new PathStyleExtension({ dash: true })], getDashArray: [6, 5],
     }),
     new LineLayer<Leg>({
       id: 'flown', data: flown, getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
-      getColor: (l) => (l.late >= SEVERE_MIN ? SEVERE : l.late >= 15 ? LATE : ON_TIME), getWidth: 3, pickable: true, autoHighlight: true, highlightColor: [241, 243, 245, 160],
+      getColor: (l) => (l.late >= SEVERE_MIN ? SEVERE : l.late >= 15 ? LATE : ON_TIME), getWidth: 3, pickable: true, autoHighlight: true, highlightColor: [241, 241, 242, 160],
     }),
     // Selected leg: dashed ahead of the plane, solid behind it.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
       id: 'selected-ahead', data: sel && !sel.cancelled && time < sel.arr ? [sel] : [],
       getSourcePosition: (l) => (planeOnSel && plane ? plane.pos : l.from), getTargetPosition: (l) => l.to,
-      getColor: [241, 243, 245, 210], getWidth: 2,
+      getColor: [241, 241, 242, 210], getWidth: 2,
       extensions: [new PathStyleExtension({ dash: true })], getDashArray: [6, 5],
       updateTriggers: { getSourcePosition: [time] },
     }),
@@ -346,8 +346,8 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       </div>
 
       <div className="map-legend">
-        <span><i style={{ background: '#55a879' }} />On time</span>
-        <span><i style={{ background: '#c99a55' }} />15+ min late</span>
+        <span><i style={{ background: '#55a87a' }} />On time</span>
+        <span><i style={{ background: '#c99655' }} />15+ min late</span>
         <span><i style={{ background: '#c96870' }} />3h+ late</span>
         <span><i className="sel" />Selected</span>
         <span><i className="future" />Not flown yet</span>

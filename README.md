@@ -122,11 +122,11 @@ place is wide enough on screen and it doesn't overlap a bigger place's name or a
 | `src/components/Panels.tsx` | Flight sidebar: header with status, route fields, root-cause rows, the aircraft's flights, and an event log |
 | `src/theme.ts`, `src/styles.css` | Category icons and labels, formatting, layout |
 
-**Colour:** cool slate neutrals (page `#171B21`, panels `#20262E`, section heads `#29313B`, cards `#252C35`, 1px lines
-`#303943`) with one muted blue accent (`#3F6FAE`) reserved for interaction, selection, focus and the active tab.
-Status stays semantic: on time `#55A879`, late `#C99A55`, severe `#C96870`. On the map, legs use the same colours as the
+**Colour:** graphite neutrals (page `#17181C`, panels `#202126`, section heads `#292A30`, cards `#25262B`, 1px lines
+`#303137`) with one muted purple accent (`#8067B7`) reserved for interaction, selection, focus and the active tab.
+Status stays semantic: on time `#55A87A`, late `#C99655`, severe `#C96870`. On the map, legs use the same colours as the
 sidebar's status tags (green on time, amber 15+ min late, red 3h+ late), the selected leg is near-white and legs not
-flown yet are a faint dashed white over darkened imagery. Blueprint's own brighter blue is swapped for the muted accent
+flown yet are a faint dashed white. Blueprint's own blue is swapped for the purple accent
 at build time (`vite.config.ts`). Category identity is always an icon plus a label.
 
 ## Built with AI
