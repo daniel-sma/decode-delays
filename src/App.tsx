@@ -1,47 +1,29 @@
 import { useEffect, useState } from 'react'
 import {
-  Alignment, Button, Callout, Card, Classes, Code, H4, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
-  NonIdealState, SegmentedControl, Spinner, Tag,
+  Alignment, Breadcrumbs, Button, Callout, Classes, Code, Drawer, H4, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
+  NonIdealState, SegmentedControl, Spinner, Tag, Tooltip, type BreadcrumbProps,
 } from '@blueprintjs/core'
-import { CATS, loadDay, loadSummary, type Arc, type Day, type Summary } from './data'
+import { flightLabel, loadDay, loadSummary, pctTraced, route, type Day, type Summary } from './data'
 import { CAT_META, prettyDate } from './theme'
-import DelayMap from './components/DelayMap'
-import Timeline from './components/Timeline'
 import HomeView from './components/HomeView'
-import { AirportPanel, ArcPanel, BackButton, FlightPanel, OverviewPanel } from './components/Panels'
+import FlightView from './components/FlightView'
 
-export type Selection =
-  | { type: 'airport'; index: number }
-  | { type: 'flight'; index: number }
-  | { type: 'arc'; arc: Arc }
-  | null
-
-type View = 'home' | 'map'
-
-const MAP_CATS = CATS.filter((c) => c !== 'security')
-const viewFromHash = (): View => (window.location.hash.startsWith('#/map') ? 'map' : 'home')
+type View = { kind: 'home' } | { kind: 'flight'; index: number }
 
 export default function App() {
   const [summary, setSummary] = useState<Summary | null | undefined>(undefined)
   const [date, setDate] = useState<string | null>(null)
   const [day, setDay] = useState<Day | null>(null)
-  const [view, setView] = useState<View>(viewFromHash)
-  const [hour, setHour] = useState<number | null>(null)
-  const [mode, setMode] = useState<'origin' | 'felt'>('origin')
-  const [playing, setPlaying] = useState(false)
-  const [selection, setSelection] = useState<Selection>(null)
+  const [view, setView] = useState<View>({ kind: 'home' })
+  const [about, setAbout] = useState(false)
 
   useEffect(() => {
     document.body.classList.add(Classes.DARK)
-    const onHash = () => setView(viewFromHash())
-    window.addEventListener('hashchange', onHash)
-    return () => window.removeEventListener('hashchange', onHash)
+    // Browser back from a flight returns to the table.
+    const onPop = (e: PopStateEvent) => setView(e.state?.flight != null ? { kind: 'flight', index: e.state.flight } : { kind: 'home' })
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
   }, [])
-
-  const go = (v: View) => {
-    window.location.hash = v === 'map' ? '#/map' : '#/'
-    setView(v)
-  }
 
   useEffect(() => {
     loadSummary().then((s) => {
@@ -53,109 +35,98 @@ export default function App() {
   useEffect(() => {
     if (!date) return
     setDay(null)
-    setSelection(null)
-    setHour(null)
+    setView({ kind: 'home' })
     loadDay(date).then(setDay)
   }, [date])
-
-  useEffect(() => {
-    if (!playing || !day) return
-    const id = setInterval(() => {
-      setHour((h) => {
-        const next = h == null ? 5 : h + 1
-        if (next >= day.hours) {
-          setPlaying(false)
-          return null
-        }
-        return next
-      })
-    }, 700)
-    return () => clearInterval(id)
-  }, [playing, day])
 
   if (summary === undefined) return <div className="splash"><Spinner /></div>
   if (summary === null) return <EmptyState />
 
   const openFlight = (i: number) => {
-    setSelection({ type: 'flight', index: i })
-    setHour(null)
-    go('map')
+    try { history.pushState({ flight: i }, '', '#flight') } catch { /* sandboxed frames may refuse */ }
+    setView({ kind: 'flight', index: i })
+  }
+  const goHome = () => {
+    try { history.pushState({}, '', '#delays') } catch { /* ignore */ }
+    setView({ kind: 'home' })
+  }
+
+  const crumbs: BreadcrumbProps[] = [{ text: 'Biggest delays', icon: 'th-list', onClick: goHome }]
+  if (view.kind === 'flight' && day) {
+    crumbs.push({ text: `${flightLabel(day, view.index)} · ${route(day, view.index)}`, icon: 'airplane', current: true })
   }
 
   return (
-    <div className="app">
-      <Navbar className="topbar">
-        <NavbarGroup align={Alignment.START}>
-          <NavbarHeading className="brand">
-            <span className="logo" aria-hidden />
-            <span>
+    <div className="shell">
+      <nav className="rail" aria-label="App">
+        <span className="logo" aria-hidden />
+        <Tooltip content="Biggest delays" placement="right"><Button variant="minimal" icon="th-list" active={view.kind === 'home'} onClick={goHome} aria-label="Biggest delays" /></Tooltip>
+        <Tooltip content="About the data" placement="right"><Button variant="minimal" icon="info-sign" active={about} onClick={() => setAbout(true)} aria-label="About the data" /></Tooltip>
+      </nav>
+
+      <div className="app">
+        <Navbar className="topbar">
+          <NavbarGroup align={Alignment.START}>
+            <NavbarHeading className="brand">
               <strong>Decode Delays</strong>
-              <small className={Classes.TEXT_MUTED}>Where US flight delays actually started</small>
-            </span>
-          </NavbarHeading>
-          <NavbarDivider />
-          <Button variant="minimal" icon="th-list" text="Biggest delays" active={view === 'home'} onClick={() => go('home')} />
-          <Button variant="minimal" icon="map" text="Delay map" active={view === 'map'} onClick={() => go('map')} />
-        </NavbarGroup>
-        <NavbarGroup align={Alignment.END}>
-          {summary.synthetic && (
-            <Tag intent="warning" icon="warning-sign" size="large" className="synthetic-tag">Synthetic sample data</Tag>
-          )}
-          <NavbarDivider />
-          <SegmentedControl
-            size="small"
-            value={date ?? undefined}
-            onValueChange={setDate}
-            options={summary.availableDays.map((d) => ({ label: prettyDate(d), value: d }))}
-          />
-        </NavbarGroup>
-      </Navbar>
-      {summary.synthetic && (
-        <Callout intent="warning" compact className="synthetic-callout" icon="warning-sign">
-          These are generated flights for previewing the design, not real data. Run <Code>npm run data</Code> to load BTS July 2026.
-        </Callout>
-      )}
+              <small className={Classes.TEXT_MUTED}>Root causes of US flight delays</small>
+            </NavbarHeading>
+            <NavbarDivider />
+            <Breadcrumbs items={crumbs} />
+          </NavbarGroup>
+          <NavbarGroup align={Alignment.END}>
+            {summary.synthetic && <Tag intent="warning" icon="warning-sign" size="large" className="synthetic-tag">Synthetic sample data</Tag>}
+            <NavbarDivider />
+            <SegmentedControl
+              size="small"
+              value={date ?? undefined}
+              onValueChange={setDate}
+              options={summary.availableDays.map((d) => ({ label: prettyDate(d), value: d }))}
+            />
+          </NavbarGroup>
+        </Navbar>
+        {summary.synthetic && (
+          <Callout intent="warning" compact className="synthetic-callout" icon="warning-sign">
+            These are generated flights for previewing the design, not real data. Run <Code>npm run data</Code> to load BTS July 2026.
+          </Callout>
+        )}
 
-      {!day ? (
-        <div className="splash"><Spinner /><p className={Classes.TEXT_MUTED}>Loading {date && prettyDate(date)}…</p></div>
-      ) : view === 'home' ? (
-        <HomeView day={day} onOpenFlight={openFlight} />
-      ) : (
-        <main className="main">
-          <div className="map-wrap">
-            <DelayMap day={day} hour={hour} mode={mode} selection={selection} onSelect={setSelection} />
-            <div className="map-overlay">
-              <SegmentedControl
-                className="map-mode"
-                value={mode}
-                onValueChange={(v) => setMode(v as 'origin' | 'felt')}
-                options={[
-                  { label: 'Where delay started', value: 'origin', icon: 'flag' },
-                  { label: 'Where it landed', value: 'felt', icon: 'locate' },
-                ]}
-              />
-              <Card compact className="legend">
-                {MAP_CATS.map((c) => (
-                  <span key={c} title={CAT_META[c].blurb}>
-                    <i style={{ background: CAT_META[c].color }} />
-                    {CAT_META[c].short}
-                  </span>
-                ))}
-                <span className={`legend-note ${Classes.TEXT_MUTED}`}>Circle size = delay minutes · arcs = delay carried by aircraft</span>
-              </Card>
-            </div>
-            <Timeline day={day} hour={hour} mode={mode} playing={playing} onHour={setHour} onPlay={setPlaying} />
-          </div>
+        {!day ? (
+          <div className="splash"><Spinner /><p className={Classes.TEXT_MUTED}>Loading {date && prettyDate(date)}…</p></div>
+        ) : view.kind === 'home' ? (
+          <HomeView day={day} summary={summary} onDay={setDate} onOpenFlight={openFlight} />
+        ) : (
+          <FlightView day={day} index={view.index} />
+        )}
+      </div>
 
-          <aside className="panel">
-            {selection && <BackButton onClick={() => setSelection(null)} />}
-            {!selection && <OverviewPanel day={day} summary={summary} onDay={setDate} onSelect={setSelection} />}
-            {selection?.type === 'airport' && <AirportPanel day={day} index={selection.index} onSelect={setSelection} />}
-            {selection?.type === 'flight' && <FlightPanel day={day} index={selection.index} onSelect={setSelection} />}
-            {selection?.type === 'arc' && <ArcPanel day={day} arc={selection.arc} onSelect={setSelection} />}
-          </aside>
-        </main>
-      )}
+      <Drawer isOpen={about} onClose={() => setAbout(false)} title="About the data" icon="info-sign" size="480px" className={Classes.DARK}>
+        <div className={`${Classes.DRAWER_BODY} about`}>
+          <p>
+            When a flight arrives 15+ minutes late, the airline must tell the Bureau of Transportation Statistics why, split
+            across five causes. The biggest is usually <b>late aircraft</b>, which only means the plane arrived late from its
+            previous flight. And <b>weather</b> only counts extreme weather; ordinary storms that slow air traffic are filed as <b>NAS</b>.
+          </p>
+          <H4>How a delay is decoded</H4>
+          <ol>
+            <li>Each flight is linked to the previous flight flown by the same tail number, if it left from where that one landed within 16 hours.</li>
+            <li>Its late-aircraft minutes are split across the previous flight’s own decoded causes, in proportion, recursively, so delay traces several legs back.</li>
+            <li>NAS and weather minutes are placed at whichever end of the flight had thunderstorms, IFR or 35 kt+ gusts on its METAR within an hour. NAS with weather on record counts as weather; otherwise it stays airspace and volume.</li>
+            <li>Minutes that can’t be traced stay grey. Totals always match what airlines reported.</li>
+          </ol>
+          <H4>Categories</H4>
+          <ul className="about-cats">
+            {(['weather', 'airspace', 'airline', 'untraced'] as const).map((c) => (
+              <li key={c}><i style={{ background: CAT_META[c].color }} /><div><b>{CAT_META[c].label}</b><span className={Classes.TEXT_MUTED}>{CAT_META[c].blurb}</span></div></li>
+            ))}
+          </ul>
+          <H4>This build</H4>
+          <p className={Classes.TEXT_MUTED}>
+            {summary.source}. {pctTraced(summary)} of late-aircraft minutes traced to a root cause. Built{' '}
+            {new Date(summary.generatedAt).toLocaleString('en-US')}.
+          </p>
+        </div>
+      </Drawer>
     </div>
   )
 }
@@ -166,7 +137,7 @@ function EmptyState() {
       <NonIdealState
         icon="database"
         title="No data yet"
-        description={<>Build the dataset from BTS and Iowa Mesonet:</>}
+        description="Build the dataset from BTS and Iowa Mesonet:"
         action={
           <div>
             <pre className={Classes.CODE_BLOCK}>pip install -r requirements.txt{'\n'}npm run data</pre>

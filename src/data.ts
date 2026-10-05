@@ -22,6 +22,7 @@ export interface Summary {
   month: string
   availableDays: string[]
   trace: { lateMinutes: number; lateTraced: number; chainBreaks: number }
+  stats: { flights: number; tails: number; wxAirports: number }
   days: DaySummary[]
 }
 
@@ -104,12 +105,6 @@ export async function loadDay(date: string): Promise<Day> {
 
 export const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
-/** Total minutes for an airport by category, for one hour or the whole day. */
-export function airportByCat(a: Airport, mode: 'origin' | 'felt', hour: number | null): number[] {
-  const src = a[mode]
-  return src.map((row) => (hour == null ? sum(row) : row[hour] ?? 0))
-}
-
 export function flightLabel(day: Day, i: number) {
   return `${day.flights.carrier[i]} ${day.flights.fn[i]}`
 }
@@ -132,20 +127,6 @@ export function decodedByCat(contribs: Contribution[]) {
   const out = CATS.map(() => 0)
   for (const c of contribs) out[c[0]] += c[5]
   return out
-}
-
-export function reportedForArrivals(day: Day, airport: number): number[] {
-  const out = REPORTED.map(() => 0)
-  const f = day.flights
-  for (let i = 0; i < f.d.length; i++) {
-    if (f.d[i] !== airport || f.otherDay[i] || !f.causes[i]) continue
-    f.causes[i]!.forEach((v, k) => (out[k] += v))
-  }
-  return out
-}
-
-export function decodedForArrivals(day: Day, airport: number): number[] {
-  return day.airports[airport].felt.map(sum)
 }
 
 
@@ -204,4 +185,8 @@ export function delayRows(day: Day, q: string, limit = 300): { rows: number[]; t
   if (s && tails.length === 1) idx.sort((a, b) => f.sdep[a] - f.sdep[b])
   else idx.sort((a, b) => (f.arrDelay[b] ?? -1) - (f.arrDelay[a] ?? -1))
   return { rows: idx.slice(0, limit), tails }
+}
+
+export function pctTraced(s: Summary) {
+  return s.trace.lateMinutes ? `${Math.round((100 * s.trace.lateTraced) / s.trace.lateMinutes)}%` : '—'
 }

@@ -1,30 +1,42 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Card, Classes, H2, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
+import { Button, Callout, Classes, Collapse, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
-import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
+import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root, type Summary } from '../data'
 import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
 import CauseCompare from './CauseCompare'
-import { RippleChain } from './Panels'
+import { RippleChain, Stat } from './Panels'
 
 interface Props {
   day: Day
+  summary: Summary
+  onDay: (d: string) => void
   onOpenFlight: (i: number) => void
 }
 
-export default function HomeView({ day, onOpenFlight }: Props) {
+interface Filter { cat: number | null; airport: number | null }
+
+export default function HomeView({ day, summary, onDay, onOpenFlight }: Props) {
   const [q, setQ] = useState('')
-  const { rows, tails } = useMemo(() => delayRows(day, q), [day, q])
+  const [filter, setFilter] = useState<Filter>({ cat: null, airport: null })
   const [selected, setSelected] = useState<Region[]>([])
   const f = day.flights
   const t = day.totals
+
+  const roots = useMemo(() => f.fn.map((_, i) => (f.otherDay[i] ? null : rootOf(day, i))), [day, f])
+  const { rows: searched, tails } = useMemo(() => delayRows(day, q, 5000), [day, q])
+  const rows = useMemo(() => searched.filter((i) => {
+    const r = roots[i]
+    if (filter.cat != null && r?.cat !== filter.cat) return false
+    if (filter.airport != null && r?.airport !== filter.airport) return false
+    return true
+  }).slice(0, 300), [searched, roots, filter])
+
+  useEffect(() => { setFilter({ cat: null, airport: null }); setQ('') }, [day])
+
   const repTotal = sum(REPORTED.map((k) => t.reported[k]))
   const delayed = useMemo(() => f.arrDelay.filter((d, i) => !f.otherDay[i] && (d ?? 0) >= 15).length, [f])
   const cancelled = sum(Object.values(t.cancelled))
   const singleTail = q.trim() && tails.length === 1 ? tails[0] : null
-
-  const cell = (render: (i: number) => React.ReactNode, className?: string) => (r: number) => (
-    <Cell className={className} interactive>{render(rows[r])}</Cell>
-  )
 
   const columns = [
     { name: 'Flight', width: 92, render: (i: number) => <strong>{flightLabel(day, i)}</strong> },
@@ -40,13 +52,14 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       render: (i: number) => {
         const r = topReported(day, i)
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
-        return <span className="dot-label"><i className={REPORTED_META[r[0]].hatch ? 'hatch' : ''} style={{ background: REPORTED_META[r[0]].hatch ? undefined : REPORTED_META[r[0]].color, ['--seg' as string]: REPORTED_META[r[0]].color }} />{REPORTED_META[r[0]].label} <span className={Classes.TEXT_MUTED}>{pct(r[1], 1)}</span></span>
+        const m = REPORTED_META[r[0]]
+        return <span className="dot-label"><i className={m.hatch ? 'hatch' : ''} style={{ background: m.hatch ? undefined : m.color, ['--seg' as string]: m.color }} />{m.label} <span className={Classes.TEXT_MUTED}>{pct(r[1], 1)}</span></span>
       },
     },
     {
       name: 'Decoded root cause', width: 190,
       render: (i: number) => {
-        const r = rootOf(day, i)
+        const r = roots[i]
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
         const c = CAT_META[CATS[r.cat]]
         return <span className="dot-label"><i style={{ background: c.color }} />{c.short} at <strong>{day.airports[r.airport]?.code ?? '?'}</strong> <span className={Classes.TEXT_MUTED}>{pct(r.share, 1)}</span></span>
@@ -55,7 +68,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     {
       name: 'Started', width: 132,
       render: (i: number) => {
-        const r = rootOf(day, i)
+        const r = roots[i]
         if (!r) return ''
         return r.hops === 0 ? 'On this flight' : `${r.hops} flight${r.hops > 1 ? 's' : ''} earlier`
       },
@@ -72,8 +85,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const baseWidth = sum(columns.map((c) => c.width))
-  const extra = Math.max(0, cardWidth - baseWidth - 2)
+  const extra = Math.max(0, cardWidth - sum(columns.map((c) => c.width)) - 2)
   const widths = columns.map((c) => c.width + (c.name === 'BTS reported' || c.name === 'Decoded root cause' ? extra / 2 : 0))
 
   const onSelection = (regions: Region[]) => {
@@ -82,85 +94,214 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     if (row != null && rows[row] != null) onOpenFlight(rows[row])
   }
 
+  const filterTags = [
+    filter.cat != null && <Tag key="c" size="large" onRemove={() => setFilter({ ...filter, cat: null })} icon={<i className="tag-dot" style={{ background: CAT_META[CATS[filter.cat]].color }} />}>Root cause: {CAT_META[CATS[filter.cat]].short}</Tag>,
+    filter.airport != null && <Tag key="a" size="large" onRemove={() => setFilter({ ...filter, airport: null })} icon="map-marker">Started at {day.airports[filter.airport].code}</Tag>,
+  ].filter(Boolean)
+
   return (
     <div className="home">
-      <div className="home-head">
-        <p className="eyebrow">{prettyDate(day.date)} · {fmt(t.flights)} flights</p>
-        <H2 className="headline">
-          Airlines filed <em>{pct(t.reported.late, repTotal)}</em> of today’s delay as “late aircraft.” Traced back plane by plane,{' '}
-          <em style={{ color: CAT_META.weather.color }}>{pct(t.decoded.weather, repTotal)}</em> started with weather.
-        </H2>
-      </div>
+      <ContextPanel day={day} summary={summary} onDay={onDay} />
 
-      <div className="home-grid">
-        <div className="home-stats">
-          <Stat label="Flights operated" value={fmt(t.flights - cancelled)} />
+      <div className="home-main">
+        <div className="kpis">
+          <Stat label="Flights scheduled" value={fmt(t.flights)} />
           <Stat label="Arrived 15+ min late" value={fmt(delayed)} sub={pct(delayed, t.flights)} />
           <Stat label="Cancelled" value={fmt(cancelled)} sub={pct(cancelled, t.flights)} />
-          <Stat label="Delay minutes" value={fmt(repTotal)} sub={`${dur(repTotal / Math.max(1, delayed))} per delayed flight`} />
+          <Stat label="Delay minutes" value={fmt(repTotal)} sub={`${dur(repTotal / Math.max(1, delayed))} avg per delayed flight`} />
+          <Stat label="Filed as late aircraft" value={pct(t.reported.late, repTotal)} sub="no root cause given" />
+          <Stat label="Traced to weather" value={pct(t.decoded.weather, repTotal)} sub={`vs ${pct(t.reported.weather, repTotal)} reported`} color={CAT_META.weather.color} />
         </div>
-        <Card className="home-compare" compact>
-          <CauseCompare reported={REPORTED.map((k) => t.reported[k])} decoded={CATS.map((k) => t.decoded[k])} />
-        </Card>
-      </div>
 
-      <Section
-        className="home-table-section"
-        title={singleTail ? `Tail ${singleTail}` : q.trim() ? `Flights matching “${q.trim()}”` : 'Biggest delays'}
-        subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Click one to trace it on the map.' : 'Click a flight to trace its delay on the map.'}
-        icon={singleTail ? 'airplane' : 'th-list'}
-        rightElement={<Tag minimal round>{fmt(rows.length)}{rows.length === 300 ? '+' : ''} flights</Tag>}
-      >
-        <SectionCard padded>
-          <InputGroup
-            size="large"
-            leftIcon="search"
-            placeholder="Search a tail number, e.g. N411WD (or a flight like DL3186)"
-            value={q}
-            onValueChange={(v) => { setQ(v); setSelected([]) }}
-            rightElement={q ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} /> : undefined}
-            autoFocus
-            spellCheck={false}
-          />
-          {singleTail && (
-            <Callout className="tail-callout" icon={null} compact>
-              <RippleChain day={day} chain={tailChain(day, rows[0])} selected={-1} roots={new Set()} onSelect={(s) => s?.type === 'flight' && onOpenFlight(s.index)} />
-            </Callout>
-          )}
-        </SectionCard>
-        <SectionCard padded={false} className="table-card" ref={cardRef}>
-          {rows.length === 0 ? (
-            <NonIdealState icon="search" title="No matching flights" description={`Nothing on ${prettyDate(day.date)} matches “${q}”. Tail numbers look like N411WD.`} />
-          ) : (
-            <Table2
-              numRows={rows.length}
-              columnWidths={widths}
-              enableRowHeader={false}
-              enableMultipleSelection={false}
-              selectionModes={[RegionCardinality.FULL_ROWS, RegionCardinality.CELLS]}
-              selectedRegionTransform={(region) => ({ rows: region.rows ?? [0, 0] })}
-              selectedRegions={selected}
-              onSelection={onSelection}
-              defaultRowHeight={30}
-              cellRendererDependencies={[rows]}
-              key={Math.round(extra)}
-            >
-              {columns.map((c) => (
-                <Column key={c.name} name={c.name} columnHeaderCellRenderer={() => <ColumnHeaderCell name={c.name} className={c.className} />} cellRenderer={cell(c.render, c.className)} />
-              ))}
-            </Table2>
-          )}
-        </SectionCard>
-      </Section>
+        <div className="home-row">
+          <Section compact title="Reported vs decoded" icon="comparison" subtitle="Delay minutes, as airlines filed them and as traced">
+            <SectionCard><CauseCompare reported={REPORTED.map((k) => t.reported[k])} decoded={CATS.map((k) => t.decoded[k])} /></SectionCard>
+          </Section>
+          <RootCauseCheck day={day} roots={roots} filter={filter} onFilter={setFilter} />
+        </div>
+
+        <Section
+          className="home-table-section"
+          title={singleTail ? `Tail ${singleTail}` : q.trim() ? `Flights matching “${q.trim()}”` : 'Biggest delays'}
+          subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : 'Open a flight to see its plane’s day on the map.'}
+          icon={singleTail ? 'airplane' : 'th-list'}
+          rightElement={<Tag minimal round>{fmt(rows.length)}{rows.length === 300 ? '+' : ''} flights</Tag>}
+        >
+          <SectionCard padded>
+            <InputGroup
+              size="large"
+              leftIcon="search"
+              placeholder="Search a tail number, e.g. N411WD (or a flight like DL3186)"
+              value={q}
+              onValueChange={(v) => { setQ(v); setSelected([]) }}
+              rightElement={q ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} /> : undefined}
+              spellCheck={false}
+            />
+            {filterTags.length > 0 && <div className="filter-tags">{filterTags}<Button variant="minimal" size="small" text="Clear filters" onClick={() => setFilter({ cat: null, airport: null })} /></div>}
+            {singleTail && rows.length > 0 && (
+              <Callout className="tail-callout" icon={null} compact>
+                <RippleChain day={day} chain={tailChain(day, rows[0])} selected={-1} roots={new Set()} onSelect={onOpenFlight} />
+              </Callout>
+            )}
+          </SectionCard>
+          <SectionCard padded={false} className="table-card" ref={cardRef}>
+            {rows.length === 0 ? (
+              <NonIdealState icon="search" title="No matching flights" description={`Nothing on ${prettyDate(day.date)} matches. Tail numbers look like N411WD.`} />
+            ) : (
+              <Table2
+                key={Math.round(extra)}
+                numRows={rows.length}
+                columnWidths={widths}
+                enableRowHeader={false}
+                enableMultipleSelection={false}
+                selectionModes={[RegionCardinality.FULL_ROWS, RegionCardinality.CELLS]}
+                selectedRegionTransform={(region) => ({ rows: region.rows ?? [0, 0] })}
+                selectedRegions={selected}
+                onSelection={onSelection}
+                defaultRowHeight={30}
+                cellRendererDependencies={[rows]}
+              >
+                {columns.map((c) => (
+                  <Column
+                    key={c.name}
+                    name={c.name}
+                    columnHeaderCellRenderer={() => <ColumnHeaderCell name={c.name} className={c.className} />}
+                    cellRenderer={(r) => <Cell className={c.className} interactive>{c.render(rows[r])}</Cell>}
+                  />
+                ))}
+              </Table2>
+            )}
+          </SectionCard>
+        </Section>
+      </div>
     </div>
   )
 }
 
-function Stat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+/** Left context panel: what this dataset is and what the pipeline did to it. */
+function ContextPanel({ day, summary, onDay }: { day: Day; summary: Summary; onDay: (d: string) => void }) {
+  const s = summary.stats
+  const steps: [string, string][] = [
+    ['Load BTS on-time data', `${fmt(s.flights)} flights, ${summary.month}`],
+    ['Chain flights by tail number', `${fmt(s.tails)} aircraft`],
+    ['Check weather at each end', `${s.wxAirports} airports, hourly METAR`],
+    ['Trace late-aircraft minutes', `${pct(summary.trace.lateTraced, summary.trace.lateMinutes)} traced to a root cause`],
+  ]
   return (
-    <Card compact className="stat">
-      <span className="stat-value">{value}</span>
-      <span className="stat-label">{label}{sub && <span className={Classes.TEXT_MUTED}> · {sub}</span>}</span>
-    </Card>
+    <aside className="context">
+      <div>
+        <p className="eyebrow">Selected day</p>
+        <h2 className="context-title">{prettyDate(day.date)}</h2>
+        <dl className="kv">
+          <dt>Source</dt><dd>{summary.synthetic ? 'Synthetic sample' : 'BTS Reporting Carrier On-Time'}</dd>
+          <dt>Weather</dt><dd>{summary.synthetic ? 'Synthetic sample' : 'Iowa Mesonet ASOS'}</dd>
+          <dt>Built</dt><dd>{new Date(summary.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</dd>
+          <dt>Clock</dt><dd>Eastern time</dd>
+        </dl>
+      </div>
+
+      <div>
+        <p className="eyebrow">Pipeline</p>
+        <ol className="steps">
+          {steps.map(([title, detail]) => (
+            <li key={title}>
+              <Icon icon="tick-circle" intent="success" size={14} />
+              <div><strong>{title}</strong><span className={Classes.TEXT_MUTED}>{detail}</span></div>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      <MonthStrip summary={summary} current={day.date} onDay={onDay} />
+    </aside>
+  )
+}
+
+function MonthStrip({ summary, current, onDay }: { summary: Summary; current: string; onDay: (d: string) => void }) {
+  const [hover, setHover] = useState<string | null>(null)
+  const max = Math.max(...summary.days.map((d) => d.delayed + d.cancelled))
+  const h = summary.days.find((d) => d.date === (hover ?? current))
+  return (
+    <div>
+      <p className="eyebrow">Disruption by day</p>
+      <div className="month" onMouseLeave={() => setHover(null)}>
+        {summary.days.map((d) => {
+          const ok = summary.availableDays.includes(d.date)
+          return (
+            <button
+              key={d.date}
+              className={`month-day${d.date === current ? ' current' : ''}${ok ? ' ok' : ''}`}
+              disabled={!ok}
+              onClick={() => ok && onDay(d.date)}
+              onMouseEnter={() => setHover(d.date)}
+              aria-label={`${prettyDate(d.date)}: ${d.delayed} delayed`}
+            >
+              <span style={{ height: `${(100 * (d.delayed + d.cancelled)) / max}%` }} />
+            </button>
+          )
+        })}
+      </div>
+      <p className={`month-read ${Classes.TEXT_MUTED}`}>{h && `${prettyDate(h.date)}: ${fmt(h.delayed)} delayed · ${fmt(h.cancelled)} cancelled`}</p>
+    </div>
+  )
+}
+
+/** Foundry-style check list: one row per root cause, expandable to the airports behind it. */
+function RootCauseCheck({ day, roots, filter, onFilter }: {
+  day: Day; roots: (Root | null)[]; filter: Filter; onFilter: (f: Filter) => void
+}) {
+  const [open, setOpen] = useState<number | null>(null)
+  const groups = useMemo(() => CATS.map((_, c) => {
+    const byAp = new Map<number, number>()
+    let flights = 0
+    roots.forEach((r) => {
+      if (r?.cat !== c) return
+      flights++
+      byAp.set(r.airport, (byAp.get(r.airport) ?? 0) + 1)
+    })
+    return { c, flights, minutes: day.totals.decoded[CATS[c]], airports: [...byAp].sort((a, b) => b[1] - a[1]).slice(0, 6) }
+  }).filter((g) => g.flights > 0), [day, roots])
+
+  return (
+    <Section compact title="Root causes" icon="diagnosis" subtitle="Flights by their biggest root cause · click to filter">
+      <SectionCard padded={false}>
+        <ul className="checks">
+          {groups.map((g) => {
+            const meta = CAT_META[CATS[g.c]]
+            const isOpen = open === g.c
+            return (
+              <li key={g.c} className={filter.cat === g.c ? 'on' : ''}>
+                <div className="check-row">
+                  <button className="check-main" onClick={() => onFilter({ cat: filter.cat === g.c ? null : g.c, airport: null })}>
+                    <i className="tag-dot" style={{ background: meta.color }} />
+                    <strong>{meta.label}</strong>
+                    <span className="check-tags">
+                      <Tag minimal round>{fmt(g.flights)} flights</Tag>
+                      <Tag minimal round>{dur(g.minutes)}</Tag>
+                    </span>
+                  </button>
+                  <Button variant="minimal" size="small" icon={isOpen ? 'chevron-up' : 'chevron-down'} aria-label={`Airports behind ${meta.label}`} onClick={() => setOpen(isOpen ? null : g.c)} />
+                </div>
+                <Collapse isOpen={isOpen}>
+                  <div className="check-detail">
+                    {g.airports.map(([ap, n]) => (
+                      <Tag
+                        key={ap}
+                        interactive
+                        minimal={filter.airport !== ap}
+                        intent={filter.airport === ap ? 'primary' : 'none'}
+                        onClick={() => onFilter({ cat: g.c, airport: filter.airport === ap ? null : ap })}
+                      >
+                        {day.airports[ap].code} · {n}
+                      </Tag>
+                    ))}
+                  </div>
+                </Collapse>
+              </li>
+            )
+          })}
+        </ul>
+      </SectionCard>
+    </Section>
   )
 }

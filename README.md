@@ -75,13 +75,17 @@ Outputs go to `public/data/`: `summary.json` (month strip and trace stats) and `
 The UI is built on **[Blueprint](https://blueprintjs.com/docs/)** (`@blueprintjs/core`, `icons`, `table`, v6),
 Palantir's open-source React toolkit for data-dense interfaces, in its dark theme.
 
+Layout takes cues from Palantir Foundry operations apps: an icon rail, a context panel, dense KPI tiles,
+a check-list of root causes, and map callouts with key/value rows per airport.
+
 | File | What it does |
 |---|---|
-| `src/App.tsx` | Blueprint `Navbar` (view switch, day `SegmentedControl`), hash routes `#/` (home) and `#/map`, play loop |
-| `src/components/HomeView.tsx` | **Home:** headline, stat `Card`s, reported vs decoded bars, tail-number search (`InputGroup`) above a `Table2` of the biggest delays. Searching one tail shows its day in order. Click a row to trace it on the map. |
-| `src/components/DelayMap.tsx` | deck.gl map: airport circles (size = minutes, colour = dominant root cause), arcs = delay carried by aircraft from root airport to where it landed, the selected plane's legs in white |
-| `src/components/Timeline.tsx` | Hourly stacked bars in a `Card`, scrub and play through the day (Eastern time) |
-| `src/components/Panels.tsx` | Map side panel: day overview, airport, flight (with the plane's tail chain) and arc views, built from `Section`/`SectionCard`, `HTMLTable` and `Tag` |
+| `src/App.tsx` | Shell: icon rail, Blueprint `Navbar` with breadcrumbs and day `SegmentedControl`, "About the data" `Drawer` |
+| `src/components/HomeView.tsx` | **Home:** context panel (dataset, pipeline steps, month strip), KPI tiles, reported vs decoded bars, root-cause check list (filters the table), tail-number search above a `Table2` of the biggest delays |
+| `src/components/FlightView.tsx` | **Flight page:** that aircraft's day on a map, the leg timeline, and the decode sidebar |
+| `src/components/FlightMap.tsx` | deck.gl map of one tail's legs (coloured by root cause, selected leg white), airport callouts with arrival/departure rows that avoid overlapping, halo where the delay began |
+| `src/components/TailTimeline.tsx` | Gantt of the plane's day: scheduled block (dashed), flown block, late portion by root cause (hatched = inherited) |
+| `src/components/Panels.tsx` | Flight sidebar: explanation sentence, stats, reported vs decoded, "where the minutes came from" table, weather at the root airport, the plane's day |
 | `src/components/CauseCompare.tsx` | Reported vs decoded 100% bars, the core comparison |
 | `src/theme.ts`, `src/styles.css` | Category colours and labels, formatting, layout. Colours reference Blueprint design tokens. |
 

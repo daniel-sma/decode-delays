@@ -333,6 +333,7 @@ def build(rows, wx_fetcher, days_arg: str | None, synthetic: bool, source: str):
         "availableDays": days,
         "trace": {"lateMinutes": stats["late_total"], "lateTraced": round(stats["late_traced"]),
                   "chainBreaks": stats["chain_breaks"]},
+        "stats": {"flights": len(F), "tails": len(by_tail), "wxAirports": sum(1 for w in wx.values() if w)},
         "days": [{"date": d, **_round(v)} for d, v in sorted(day_rows.items())],
     }
     (OUT / "summary.json").write_text(json.dumps(summary, separators=(",", ":")))
