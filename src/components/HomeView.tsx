@@ -172,12 +172,12 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     <div className="home">
       <div className="home-main">
         <div className="kpis">
-            <Stat label="Est. delay cost" value={cost(repTotal)} />
-            <Stat label="Hidden as “late aircraft”" value={cost(t.reported.late)} />
-            <Stat label="Traced to weather" value={cost(t.decoded.weather)} />
-            <Stat label="Airline-controllable" value={cost(t.decoded.airline)} />
-            <Stat label="Flights delayed 15+ min" value={fmt(delayed)} />
-            <Stat label="Cancelled" value={fmt(cancelled)} />
+            <Stat icon="dollar" label="Est. delay cost" value={cost(repTotal)} />
+            <Stat icon="history" label="Hidden as late aircraft" value={cost(t.reported.late)} />
+            <Stat icon="cloud" label="Traced to weather" value={cost(t.decoded.weather)} />
+            <Stat icon="wrench" label="Airline-controllable" value={cost(t.decoded.airline)} />
+            <Stat icon="time" label="Delayed 15+ min" value={fmt(delayed)} />
+            <Stat icon="cross-circle" label="Cancelled" value={fmt(cancelled)} />
         </div>
 
         <Section

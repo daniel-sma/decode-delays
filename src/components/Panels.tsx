@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Button, Card, Classes, Icon, Tag, type Intent } from '@blueprintjs/core'
+import { Button, Card, Icon, Tag, type Intent } from '@blueprintjs/core'
 import type { IconName } from '@blueprintjs/icons'
 import { CATS, REPORTED, flightLabel, route, sum, type Day } from '../data'
 import { CAT_META, COST_PER_MIN, REPORTED_META, dur, hourLabel, money, pct } from '../theme'
@@ -73,18 +73,16 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
         <Button variant="minimal" size="small" icon="cross" aria-label="Back to biggest delays" onClick={onClose} />
       </div>
 
-      <SideSection title="Route">
-        <div className="field">
-          <Icon icon="map-marker" size={14} />
-          <span className="field-main"><b>{o.code}</b> <span className={Classes.TEXT_MUTED}>{o.city}</span></span>
-          <span className="field-time">{t24(f.sdep[index])}{!cancelled && f.depDelay[index] != null && <> → {t24(dep)}</>}</span>
+      <div className="side-body facts-wrap">
+        <div className="facts">
+          <Fact label={`Departed ${o.code}`} value={cancelled ? 'Cancelled' : <>{t24(dep)}<span className="fact-sub">sched {clock24(f.sdep[index])}</span></>} />
+          <Fact label={`Arrived ${d.code}`} value={cancelled ? '—' : <>{t24(arr)}<span className="fact-sub">sched {clock24(f.sarr[index])}</span></>} />
+          <Fact label="Arrival delay" value={cancelled ? '—' : ownMin ? dur(ownMin) : 'On time'} late={ownMin > 0} />
+          <Fact label="Delay cost" value={ownMin ? money(ownMin * COST_PER_MIN, true) : '—'} />
+          <Fact label="Root cause" value={causes[0] ? <><Icon icon={CAT_META[CATS[causes[0].cat]].icon} size={14} />{CAT_META[CATS[causes[0].cat]].short}</> : '—'} />
+          <Fact label="Delay started at" value={causes[0] ? day.airports[causes[0].ap]?.code ?? '—' : '—'} />
         </div>
-        <div className="field">
-          <Icon icon="flag" size={14} />
-          <span className="field-main"><b>{d.code}</b> <span className={Classes.TEXT_MUTED}>{d.city}</span></span>
-          <span className="field-time">{t24(f.sarr[index])}{!cancelled && f.arrDelay[index] != null && <> → {t24(arr)}</>}</span>
-        </div>
-      </SideSection>
+      </div>
 
       <SideSection title="Root cause" right={total ? dur(total) : undefined}>
         {causes.length === 0 ? (
@@ -181,6 +179,15 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
   )
 }
 
+function Fact({ label, value, late }: { label: string; value: React.ReactNode; late?: boolean }) {
+  return (
+    <div className="fact">
+      <span className={`fact-value${late ? ' late' : ''}`}>{value}</span>
+      <span className="fact-label">{label}</span>
+    </div>
+  )
+}
+
 function SideSection({ title, right, children }: { title: string; right?: string; children: React.ReactNode }) {
   return (
     <section className="side-section">
@@ -245,11 +252,14 @@ export function RippleChain({ day, chain, selected, onSelect }: {
   )
 }
 
-export function Stat({ label, value }: { label: string; value: string }) {
+export function Stat({ label, value, icon }: { label: string; value: string; icon: IconName }) {
   return (
     <Card compact className="stat">
-      <span className="stat-label">{label}</span>
-      <span className="stat-value">{value}</span>
+      <span className="stat-icon"><Icon icon={icon} size={18} /></span>
+      <span className="stat-text">
+        <span className="stat-value">{value}</span>
+        <span className="stat-label">{label}</span>
+      </span>
     </Card>
   )
 }
