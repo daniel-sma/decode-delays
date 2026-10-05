@@ -4,6 +4,7 @@ import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region 
 import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
 import { CAT_META, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
 import { RippleChain, Stat, statusTag } from './Panels'
+import type { IconName } from '@blueprintjs/icons'
 import CatLabel from './CatLabel'
 import { RootCauseMenu, SearchFilterMenu, SimpleFilterMenu, type Choice } from './HeaderMenus'
 
@@ -12,12 +13,15 @@ interface Props {
   onOpenFlight: (i: number) => void
 }
 
-type Status = 'delayed' | 'severe' | 'ontime' | 'cancelled' | 'all'
-interface Filter { cat: number | null; airport: number | null; status: Status; at: number | null }
-const NO_FILTER: Filter = { cat: null, airport: null, status: 'delayed', at: null }
-const STATUS: Choice<Status>[] = [
-  { value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' },
-  { value: 'cancelled', label: 'Cancelled' }, { value: 'ontime', label: 'On time' }, { value: 'all', label: 'All flights' },
+type Status = 'delayed' | 'severe'
+/** Delay cost order; null is the default (highest first, or flight order when the search is one aircraft). */
+type Sort = 'desc' | 'asc' | null
+interface Filter { cat: number | null; airport: number | null; status: Status; at: number | null; sort: Sort }
+const NO_FILTER: Filter = { cat: null, airport: null, status: 'delayed', at: null, sort: null }
+const STATUS: Choice<Status>[] = [{ value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' }]
+const SORT: Choice<'desc' | 'asc'>[] = [
+  { value: 'desc', label: 'Highest to lowest', icon: 'sort-numerical-desc' },
+  { value: 'asc', label: 'Lowest to highest', icon: 'sort-numerical' },
 ]
 
 // Width reserved for the table's vertical scrollbar so columns never overflow sideways.
@@ -31,6 +35,8 @@ interface Col {
   /** Blueprint header menu used as this column's filter */
   menu?: () => React.JSX.Element
   filtered?: boolean
+  /** Header menu button icon; when set it shows the column's state, so the name gets no extra icon */
+  menuIcon?: IconName
 }
 
 export default function HomeView({ day, onOpenFlight }: Props) {
@@ -55,8 +61,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       const status = query && filter.status === 'delayed' ? 'all' : filter.status
       if (status === 'delayed' && (c || a < 15)) continue
       if (status === 'severe' && (c || a < 180)) continue
-      if (status === 'ontime' && (c || a >= 15)) continue
-      if (status === 'cancelled' && !c) continue
       if (filter.at != null && f.o[i] !== filter.at && f.d[i] !== filter.at) continue
       const r = roots[i]
       if (filter.cat != null && r?.cat !== filter.cat) continue
@@ -65,7 +69,15 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     }
     const tails = query ? [...new Set(out.map((i) => f.tail[i]))] : []
     // One aircraft reads best in flight order; everything else worst first, cancellations after delays.
-    if (tails.length === 1) out.sort((x, y) => f.sdep[x] - f.sdep[y])
+    // A chosen cost order applies to every view; flights without a delay cost always go last.
+    const costMin = (i: number) => ((f.arrDelay[i] ?? 0) >= 15 ? f.arrDelay[i]! : null)
+    const byCost = (dir: 1 | -1) => (x: number, y: number) => {
+      const a = costMin(x), b = costMin(y)
+      if (a == null || b == null) return a == null && b == null ? (f.arrDelay[y] ?? -1) - (f.arrDelay[x] ?? -1) : a == null ? 1 : -1
+      return dir * (a - b)
+    }
+    if (filter.sort) out.sort(byCost(filter.sort === 'asc' ? 1 : -1))
+    else if (tails.length === 1) out.sort((x, y) => f.sdep[x] - f.sdep[y])
     else out.sort((x, y) => (f.arrDelay[y] ?? -1) - (f.arrDelay[x] ?? -1))
     return { rows: out, tails }
   }, [f, query, filter, roots])
@@ -80,7 +92,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     roots.forEach((r) => { if (r && (filter.cat == null || r.cat === filter.cat)) m.set(r.airport, (m.get(r.airport) ?? 0) + 1) })
     return [...m].sort((a, b) => b[1] - a[1])
   }, [roots, filter.cat])
-  const filtersSet = filter.cat != null || filter.airport != null || filter.at != null || filter.status !== 'delayed'
+  const filtersSet = filter.cat != null || filter.airport != null || filter.at != null || filter.status !== 'delayed' || filter.sort != null
 
   useEffect(() => { setFilter(NO_FILTER); setQ('') }, [day])
 
@@ -109,7 +121,9 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       menu: () => <SimpleFilterMenu<Status> title="Status" items={STATUS} value={filter.status} onPick={(status) => setFilter({ ...filter, status })} />,
     },
     {
-      name: 'Delay cost', width: 104, className: 'num',
+      name: 'Delay cost', width: 116, className: 'num', filtered: filter.sort != null,
+      menuIcon: filter.sort === 'asc' ? 'sort-numerical' : 'sort-numerical-desc',
+      menu: () => <SimpleFilterMenu<'desc' | 'asc'> title="Sort by delay cost" items={SORT} value={filter.sort ?? 'desc'} onPick={(sort) => setFilter({ ...filter, sort })} />,
       render: (i) => ((f.arrDelay[i] ?? 0) >= 15 ? <span className="mono">{money((f.arrDelay[i] ?? 0) * COST_PER_MIN, true)}</span> : <span className={Classes.TEXT_MUTED}>—</span>),
     },
     {
@@ -228,9 +242,9 @@ export default function HomeView({ day, onOpenFlight }: Props) {
                         name={c.name}
                         className={`${c.className ?? ''}${c.menu ? ' has-filter' : ''}${c.filtered ? ' filtered' : ''}`}
                         menuRenderer={c.menu}
-                        menuIcon={c.filtered ? 'filter-keep' : 'filter'}
+                        menuIcon={c.menuIcon ?? (c.filtered ? 'filter-keep' : 'filter')}
                         nameRenderer={(name) => (
-                          <span className="th-name">{name}{c.filtered && <Icon icon="filter" size={12} className="th-filter-on" />}</span>
+                          <span className="th-name">{name}{c.filtered && !c.menuIcon && <Icon icon="filter" size={12} className="th-filter-on" />}</span>
                         )}
                       />
                     )}
