@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Alignment, Callout, Classes, Code, H4, Icon, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
   NonIdealState, Spinner, Tag,
@@ -9,22 +9,18 @@ import HomeView from './components/HomeView'
 import FlightView from './components/FlightView'
 import DayPicker from './components/DayPicker'
 
-type View = { kind: 'home' } | { kind: 'flight'; index: number }
+/** One open aircraft. `opened` is the flight it was opened on; `selected` follows the sidebar. */
+interface FlightTab { id: number; tail: string; opened: number; selected: number }
 
 export default function App() {
   const [summary, setSummary] = useState<Summary | null | undefined>(undefined)
   const [date, setDate] = useState<string | null>(null)
   const [day, setDay] = useState<Day | null>(null)
-  const [view, setView] = useState<View>({ kind: 'home' })
-  const [lastFlight, setLastFlight] = useState<number | null>(null)
+  const [tabs, setTabs] = useState<FlightTab[]>([])
+  const [active, setActive] = useState<number | null>(null) // tab id, or null for the delays table
+  const nextId = useRef(1)
 
-  useEffect(() => {
-    document.body.classList.add(Classes.DARK)
-    // Browser back from a flight returns to the table.
-    const onPop = (e: PopStateEvent) => setView(e.state?.flight != null ? { kind: 'flight', index: e.state.flight } : { kind: 'home' })
-    window.addEventListener('popstate', onPop)
-    return () => window.removeEventListener('popstate', onPop)
-  }, [])
+  useEffect(() => { document.body.classList.add(Classes.DARK) }, [])
 
   useEffect(() => {
     loadSummary().then((s) => {
@@ -39,47 +35,52 @@ export default function App() {
   useEffect(() => {
     if (!date) return
     setDay(null)
-    setView({ kind: 'home' })
-    setLastFlight(null)
+    setTabs([])
+    setActive(null)
     loadDay(date).then(setDay)
   }, [date])
 
   if (summary === undefined) return <div className="splash"><Spinner /></div>
   if (summary === null) return <EmptyState />
 
+  // Each new aircraft gets its own tab; opening a flight of an aircraft that's already open reuses that tab.
   const openFlight = (i: number) => {
-    try { history.pushState({ flight: i }, '', '#flight') } catch { /* sandboxed frames may refuse */ }
-    setLastFlight(i)
-    setView({ kind: 'flight', index: i })
+    if (!day) return
+    const tail = day.flights.tail[i] || `#${i}`
+    const existing = tabs.find((t) => t.tail === tail)
+    const id = nextId.current++ // a fresh id (re)mounts the tab on the requested flight
+    if (existing) setTabs((ts) => ts.map((t) => (t.id === existing.id ? { ...t, id, opened: i, selected: i } : t)))
+    else setTabs((ts) => [...ts, { id, tail, opened: i, selected: i }])
+    setActive(id)
   }
-  const goHome = () => {
-    try { history.pushState({}, '', '#delays') } catch { /* ignore */ }
-    setView({ kind: 'home' })
+  const closeTab = (id: number) => {
+    const idx = tabs.findIndex((t) => t.id === id)
+    const rest = tabs.filter((t) => t.id !== id)
+    setTabs(rest)
+    if (active === id) setActive(rest.length ? rest[Math.max(0, idx - 1)].id : null)
   }
-
-  // Workspace tabs, as in Palantir apps: the delays table, plus the flight that's open.
-  const [flightTab, setFlightTab] = [lastFlight, setLastFlight]
+  const current = tabs.find((t) => t.id === active)
 
   return (
     <div className="app">
       <Navbar className="topbar">
-        <NavbarGroup align={Alignment.START}>
+        <NavbarGroup align={Alignment.START} className="topbar-left">
           <NavbarHeading>Decode Delays</NavbarHeading>
           <NavbarDivider />
           <div className="tabs" role="tablist">
-            <button role="tab" aria-selected={view.kind === 'home'} className={`ws-tab${view.kind === 'home' ? ' on' : ''}`} onClick={goHome}>
+            <button role="tab" aria-selected={active == null} className={`ws-tab${active == null ? ' on' : ''}`} onClick={() => setActive(null)}>
               <Icon icon="th-list" size={14} /> Biggest delays
             </button>
-            {flightTab != null && day && (
-              <span role="tab" aria-selected={view.kind === 'flight'} className={`ws-tab${view.kind === 'flight' ? ' on' : ''}`}>
-                <button className="ws-tab-label" onClick={() => openFlight(flightTab)}>
-                  <Icon icon="airplane" size={14} /> {flightLabel(day, flightTab)} · {route(day, flightTab)}
+            {day && tabs.map((t) => (
+              <span key={t.id} role="tab" aria-selected={active === t.id} className={`ws-tab${active === t.id ? ' on' : ''}`}>
+                <button className="ws-tab-label" onClick={() => setActive(t.id)} title={`${t.tail} · ${route(day, t.selected)}`}>
+                  <Icon icon="airplane" size={14} /> {flightLabel(day, t.selected)} · {route(day, t.selected)}
                 </button>
-                <button className="ws-tab-close" aria-label="Close flight" onClick={() => { setFlightTab(null); goHome() }}>
+                <button className="ws-tab-close" aria-label={`Close ${flightLabel(day, t.selected)}`} onClick={() => closeTab(t.id)}>
                   <Icon icon="small-cross" size={14} />
                 </button>
               </span>
-            )}
+            ))}
           </div>
         </NavbarGroup>
         <NavbarGroup align={Alignment.END}>
@@ -95,10 +96,16 @@ export default function App() {
 
       {!day ? (
         <div className="splash"><Spinner /><p className={Classes.TEXT_MUTED}>Loading {date && prettyDate(date)}…</p></div>
-      ) : view.kind === 'home' ? (
-        <HomeView day={day} onOpenFlight={openFlight} />
+      ) : current ? (
+        <FlightView
+          key={current.id}
+          day={day}
+          initial={current.opened}
+          onSelectedChange={(i) => setTabs((ts) => ts.map((t) => (t.id === current.id && t.selected !== i ? { ...t, selected: i } : t)))}
+          onClose={() => closeTab(current.id)}
+        />
       ) : (
-        <FlightView day={day} index={view.index} onClose={goHome} />
+        <HomeView day={day} onOpenFlight={openFlight} />
       )}
     </div>
   )

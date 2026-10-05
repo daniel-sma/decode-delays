@@ -6,21 +6,24 @@ import { FlightPanel } from './Panels'
 
 const TICK_MS = 100 // at 1x, one simulated minute per tick
 
-/** One flight's page: its aircraft's day on the map with a playback scrubber, the decode in the sidebar. */
-export default function FlightView({ day, index, onClose }: { day: Day; index: number; onClose: () => void }) {
-  const [selected, setSelected] = useState(index)
-  const chain = useMemo(() => tailChain(day, index), [day, index])
+/**
+ * One aircraft's page: its day on the map with a playback scrubber, the decode in the sidebar.
+ * Mounted once per tab; `initial` is the flight the tab was opened on.
+ */
+export default function FlightView({ day, initial, onSelectedChange, onClose }: {
+  day: Day
+  initial: number
+  onSelectedChange: (i: number) => void
+  onClose: () => void
+}) {
+  const [selected, setSelected] = useState(initial)
+  const chain = useMemo(() => tailChain(day, initial), [day, initial])
   const win = useMemo(() => chainWindow(day, chain), [day, chain])
-  const [time, setTime] = useState(() => actualDep(day, index))
+  const [time, setTime] = useState(() => actualDep(day, initial))
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(4)
 
-  // Opening a different flight resets the page to that flight's departure.
-  useEffect(() => {
-    setSelected(index)
-    setTime(actualDep(day, index))
-    setPlaying(false)
-  }, [day, index])
+  useEffect(() => onSelectedChange(selected), [selected]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!playing) return

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
-import { WebMercatorViewport, type MapViewState } from '@deck.gl/core'
+import { MapView, WebMercatorViewport, type MapViewState } from '@deck.gl/core'
 import { BitmapLayer, GeoJsonLayer, IconLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
 import { TileLayer } from '@deck.gl/geo-layers'
 import { PathStyleExtension } from '@deck.gl/extensions'
@@ -16,8 +16,12 @@ const topo = statesTopo as unknown as Topology
 const states = feature(topo, topo.objects.states)
 
 // Bundled satellite image (NASA Blue Marble, see pipeline/make_basemap.py); bounds must match that script.
-const BASEMAP = `${import.meta.env.BASE_URL}basemap/conus.jpg`
-const BASEMAP_BOUNDS: [number, number, number, number] = [-128, 22, -64, 51]
+const BASEMAP = `${import.meta.env.BASE_URL}basemap/world.jpg`
+const BASEMAP_BOUNDS: [number, number, number, number] = [-180, -85.0511, 180, 85.0511]
+const MIN_ZOOM = 1.6 // the whole world fills the view; no empty space past the poles
+const MAX_ZOOM = 9
+// Repeat the world horizontally so panning past the antimeridian never shows empty space.
+const VIEW = new MapView({ repeat: true })
 // Sharper imagery where the host is reachable; tiles that fail to load leave the bundled image showing.
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
@@ -166,7 +170,9 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       placed.some((o) => b.x < o.x + o.w + 4 && b.x + b.w + 4 > o.x && b.y < o.y + o.h + 4 && b.y + b.h + 4 > o.y)
     return order.map((ap) => {
       const a = day.airports[ap]
-      const [x, y] = viewport.project([a.lon, a.lat])
+      // Project onto whichever world copy is nearest the view centre (the map repeats horizontally).
+      const lon = a.lon + 360 * Math.round((view.longitude - a.lon) / 360)
+      const [x, y] = viewport.project([lon, a.lat])
       const detail = ap === s.o || ap === s.d
       const w = detail ? 150 : 44, h = detail ? 40 : 18, g = 8
       const spots = [
@@ -177,7 +183,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       placed.push({ ...spot, w, h })
       return { ap, detail, box: { ...spot, w, h } }
     })
-  }, [viewport, airports, day, s.o, s.d])
+  }, [viewport, airports, day, s.o, s.d, view.longitude])
 
   const dep = actualDep(day, selected)
   const arr = actualArr(day, selected)
@@ -186,8 +192,9 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   return (
     <div className="flight-map" ref={wrap}>
       <DeckGL
+        views={VIEW}
         viewState={view}
-        onViewStateChange={({ viewState }) => setView(viewState as MapViewState)}
+        onViewStateChange={({ viewState }) => setView(clampView(viewState as MapViewState))}
         controller={{ dragRotate: false, touchRotate: false }}
         layers={layers}
         getCursor={({ isHovering }) => (isHovering ? 'pointer' : 'grab')}
@@ -225,13 +232,17 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
         <span><i className="future" />Not flown yet</span>
       </div>
       <ButtonGroup className="map-tools" vertical>
-        <Button icon="zoom-in" onClick={() => setView({ ...view, zoom: view.zoom + 0.6 })} aria-label="Zoom in" />
-        <Button icon="zoom-out" onClick={() => setView({ ...view, zoom: view.zoom - 0.6 })} aria-label="Zoom out" />
+        <Button icon="zoom-in" onClick={() => setView(clampView({ ...view, zoom: view.zoom + 0.6 }))} aria-label="Zoom in" />
+        <Button icon="zoom-out" onClick={() => setView(clampView({ ...view, zoom: view.zoom - 0.6 }))} aria-label="Zoom out" />
         <Button icon="zoom-to-fit" onClick={() => setFitKey((k) => k + 1)} aria-label="Fit route" />
       </ButtonGroup>
       <div className="map-credit">Imagery: NASA Blue Marble · Esri, Maxar, Earthstar Geographics</div>
     </div>
   )
+}
+
+function clampView(v: MapViewState): MapViewState {
+  return { ...v, zoom: Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, v.zoom)), latitude: Math.max(-70, Math.min(75, v.latitude)) }
 }
 
 /** Screen bearing (degrees clockwise from north) from a to b, good enough at map scale. */

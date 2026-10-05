@@ -75,7 +75,13 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
 
       <SideSection title="Root cause" right={total ? dur(total) : undefined}>
         {causes.length === 0 ? (
-          <p className="side-empty">{cancelled ? `Cancelled; airline cited ${CANCEL[f.status[index].slice(1)] ?? 'no cause'}.` : 'Under 15 minutes late, so no cause is recorded.'}</p>
+          <div className="row info-row">
+            <Icon icon="info-sign" size={14} />
+            <span className="row-main">
+              <b>{cancelled ? 'Cancelled' : 'No cause recorded'}</b>
+              <span>{cancelled ? `Airline cited ${CANCEL[f.status[index].slice(1)] ?? 'no cause'}` : 'Arrived under 15 min late'}</span>
+            </span>
+          </div>
         ) : (
           <ul className="rows">
             {causes.slice(0, 5).map((c, k) => {

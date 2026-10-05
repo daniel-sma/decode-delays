@@ -1,38 +1,76 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
-import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root } from '../data'
+import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root } from '../data'
 import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
 import { RippleChain, Stat, statusTag } from './Panels'
 import CatLabel from './CatLabel'
+import FilterSelect from './FilterSelect'
 
 interface Props {
   day: Day
   onOpenFlight: (i: number) => void
 }
 
-interface Filter { cat: number | null; airport: number | null }
+type Status = 'delayed' | 'severe' | 'ontime' | 'cancelled' | 'all'
+interface Filter { cat: number | null; airport: number | null; status: Status; carrier: string | null; at: number | null }
+const NO_FILTER: Filter = { cat: null, airport: null, status: 'delayed', carrier: null, at: null }
 
 // Width reserved for the table's vertical scrollbar so columns never overflow sideways.
 const SCROLLBAR = 16
 
 export default function HomeView({ day, onOpenFlight }: Props) {
   const [q, setQ] = useState('')
-  const [filter, setFilter] = useState<Filter>({ cat: null, airport: null })
+  const [filter, setFilter] = useState<Filter>(NO_FILTER)
   const [selected, setSelected] = useState<Region[]>([])
   const f = day.flights
   const t = day.totals
 
   const roots = useMemo(() => f.fn.map((_, i) => (f.otherDay[i] ? null : rootOf(day, i))), [day, f])
-  const { rows: searched, tails } = useMemo(() => delayRows(day, q, 5000), [day, q])
-  const rows = useMemo(() => searched.filter((i) => {
-    const r = roots[i]
-    if (filter.cat != null && r?.cat !== filter.cat) return false
-    if (filter.airport != null && r?.airport !== filter.airport) return false
-    return true
-  }).slice(0, 300), [searched, roots, filter])
+  const query = q.trim().toUpperCase().replace(/\s+/g, '')
+  const { rows, tails } = useMemo(() => {
+    const out: number[] = []
+    for (let i = 0; i < f.fn.length; i++) {
+      if (f.otherDay[i]) continue
+      if (query) {
+        const label = f.carrier[i] + f.fn[i]
+        if (!(f.tail[i].toUpperCase().startsWith(query) || label === query || (query.length >= 3 && label.startsWith(query)))) continue
+      }
+      const a = f.arrDelay[i] ?? 0, c = f.status[i].startsWith('C')
+      // A search shows every matching flight unless a status is chosen explicitly.
+      const status = query && filter.status === 'delayed' ? 'all' : filter.status
+      if (status === 'delayed' && (c || a < 15)) continue
+      if (status === 'severe' && (c || a < 180)) continue
+      if (status === 'ontime' && (c || a >= 15)) continue
+      if (status === 'cancelled' && !c) continue
+      if (filter.carrier && f.carrier[i] !== filter.carrier) continue
+      if (filter.at != null && f.o[i] !== filter.at && f.d[i] !== filter.at) continue
+      const r = roots[i]
+      if (filter.cat != null && r?.cat !== filter.cat) continue
+      if (filter.airport != null && r?.airport !== filter.airport) continue
+      out.push(i)
+    }
+    const tails = query ? [...new Set(out.map((i) => f.tail[i]))] : []
+    // One aircraft reads best in flight order; everything else worst first, cancellations after delays.
+    if (tails.length === 1) out.sort((x, y) => f.sdep[x] - f.sdep[y])
+    else out.sort((x, y) => (f.arrDelay[y] ?? -1) - (f.arrDelay[x] ?? -1))
+    return { rows: out, tails }
+  }, [f, query, filter, roots])
 
-  useEffect(() => { setFilter({ cat: null, airport: null }); setQ('') }, [day])
+  const carriers = useMemo(() => countBy(f.carrier.filter((_, i) => !f.otherDay[i])), [f])
+  const airportsUsed = useMemo(() => {
+    const m = new Map<number, number>()
+    f.o.forEach((o, i) => { if (!f.otherDay[i]) { m.set(o, (m.get(o) ?? 0) + 1); m.set(f.d[i], (m.get(f.d[i]) ?? 0) + 1) } })
+    return [...m].sort((a, b) => b[1] - a[1])
+  }, [f])
+  const rootAirports = useMemo(() => {
+    const m = new Map<number, number>()
+    roots.forEach((r) => { if (r && (filter.cat == null || r.cat === filter.cat)) m.set(r.airport, (m.get(r.airport) ?? 0) + 1) })
+    return [...m].sort((a, b) => b[1] - a[1])
+  }, [roots, filter.cat])
+  const filtersSet = filter.cat != null || filter.airport != null || filter.carrier != null || filter.at != null || filter.status !== 'delayed'
+
+  useEffect(() => { setFilter(NO_FILTER); setQ('') }, [day])
 
   const repTotal = sum(REPORTED.map((k) => t.reported[k]))
   const delayed = useMemo(() => f.arrDelay.filter((d, i) => !f.otherDay[i] && (d ?? 0) >= 15).length, [f])
@@ -96,10 +134,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     if (row != null && rows[row] != null) onOpenFlight(rows[row])
   }
 
-  const filterTags = [
-    filter.cat != null && <Tag key="c" size="large" onRemove={() => setFilter({ ...filter, cat: null })} icon={CAT_META[CATS[filter.cat]].icon}>Root cause: {CAT_META[CATS[filter.cat]].short}</Tag>,
-    filter.airport != null && <Tag key="a" size="large" onRemove={() => setFilter({ ...filter, airport: null })} icon="map-marker">Started at {day.airports[filter.airport].code}</Tag>,
-  ].filter(Boolean)
 
   return (
     <div className="home">
@@ -120,19 +154,44 @@ export default function HomeView({ day, onOpenFlight }: Props) {
           title={singleTail ? `Tail ${singleTail}` : q.trim() ? `Flights matching “${q.trim()}”` : 'Biggest delays'}
           subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : 'Open a flight to see its plane’s day on the map.'}
           icon={singleTail ? 'airplane' : 'th-list'}
-          rightElement={<Tag minimal>{fmt(rows.length)}{rows.length === 300 ? '+' : ''} flights</Tag>}
         >
           <SectionCard padded>
             <InputGroup
               size="large"
               leftIcon="search"
-              placeholder="Search a tail number, e.g. N411WD (or a flight like DL3186)"
+              placeholder="Search a tail number or a flight number, e.g. AA 2671 or N102UW"
               value={q}
               onValueChange={(v) => { setQ(v); setSelected([]) }}
               rightElement={q ? <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} /> : undefined}
               spellCheck={false}
             />
-            {filterTags.length > 0 && <div className="filter-tags">{filterTags}<Button variant="minimal" size="small" text="Clear filters" onClick={() => setFilter({ cat: null, airport: null })} /></div>}
+            <div className="filter-bar">
+              <FilterSelect<Status>
+                label="Status" icon="time" value={filter.status} onChange={(status) => setFilter({ ...filter, status })}
+                options={[
+                  { value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' },
+                  { value: 'cancelled', label: 'Cancelled' }, { value: 'ontime', label: 'On time' }, { value: 'all', label: 'All flights' },
+                ]}
+              />
+              <FilterSelect<string | null>
+                label="Airline" icon="airplane" value={filter.carrier} onChange={(carrier) => setFilter({ ...filter, carrier })} searchable
+                options={[{ value: null, label: 'Any' }, ...carriers.map(([c, n]) => ({ value: c, label: c, count: n }))]}
+              />
+              <FilterSelect<number | null>
+                label="Root cause" icon="diagnosis" value={filter.cat} onChange={(cat) => setFilter({ ...filter, cat, airport: null })}
+                options={[{ value: null, label: 'Any' }, ...CATS.map((c, k) => ({ value: k, label: CAT_META[c].label, icon: CAT_META[c].icon }))]}
+              />
+              <FilterSelect<number | null>
+                label="Started at" icon="map-marker" value={filter.airport} onChange={(airport) => setFilter({ ...filter, airport })} searchable
+                options={[{ value: null, label: 'Any' }, ...rootAirports.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
+              />
+              <FilterSelect<number | null>
+                label="Airport" icon="locate" value={filter.at} onChange={(at) => setFilter({ ...filter, at })} searchable
+                options={[{ value: null, label: 'Any' }, ...airportsUsed.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
+              />
+              {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
+              <span className="filter-count">{fmt(rows.length)} {rows.length === 1 ? 'flight' : 'flights'}</span>
+            </div>
             {singleTail && rows.length > 0 && (
               <Callout className="tail-callout" icon={null} compact>
                 <RippleChain day={day} chain={tailChain(day, rows[0])} selected={-1} roots={new Set()} onSelect={onOpenFlight} />
@@ -197,7 +256,7 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
             const catOn = filter.cat === g.c && filter.airport == null
             return (
               <li key={g.c} className={filter.cat === g.c ? 'on' : ''}>
-                <button className="check-main" aria-pressed={catOn} onClick={() => onFilter(catOn ? { cat: null, airport: null } : { cat: g.c, airport: null })}>
+                <button className="check-main" aria-pressed={catOn} onClick={() => onFilter(catOn ? { ...filter, cat: null, airport: null } : { ...filter, cat: g.c, airport: null })}>
                   <strong><Icon icon={meta.icon} size={16} />{meta.label}</strong>
                   <span className="check-tags">
                     <Tag minimal>{fmt(g.flights)} flights</Tag>
@@ -214,7 +273,7 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
                         minimal={!on}
                         intent={on ? 'primary' : 'none'}
                         className="ap-chip"
-                        onClick={() => onFilter(on ? { cat: g.c, airport: null } : { cat: g.c, airport: ap })}
+                        onClick={() => onFilter(on ? { ...filter, cat: g.c, airport: null } : { ...filter, cat: g.c, airport: ap })}
                       >
                         <strong>{day.airports[ap].code}</strong> {n}
                       </Tag>
@@ -228,4 +287,10 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
       </SectionCard>
     </Section>
   )
+}
+
+function countBy(xs: string[]): [string, number][] {
+  const m = new Map<string, number>()
+  for (const x of xs) m.set(x, (m.get(x) ?? 0) + 1)
+  return [...m].sort((a, b) => b[1] - a[1])
 }
