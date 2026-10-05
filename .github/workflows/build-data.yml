@@ -12,7 +12,7 @@ on:
         description: BTS month (1-12)
         default: "7"
       days:
-        description: Comma-separated YYYY-MM-DD days to export (blank = worst day + next)
+        description: Comma-separated YYYY-MM-DD days to export (blank = the 6 most disrupted days)
         default: ""
   push:
     paths:

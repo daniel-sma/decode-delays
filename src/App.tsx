@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   Alignment, Breadcrumbs, Button, Callout, Classes, Code, Drawer, H4, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
-  NonIdealState, SegmentedControl, Spinner, Tag, Tooltip, type BreadcrumbProps,
+  HTMLSelect, NonIdealState, Spinner, Tag, Tooltip, type BreadcrumbProps,
 } from '@blueprintjs/core'
 import { flightLabel, loadDay, loadSummary, pctTraced, route, type Day, type Summary } from './data'
 import { CAT_META, prettyDate } from './theme'
@@ -77,11 +77,14 @@ export default function App() {
           <NavbarGroup align={Alignment.END}>
             {summary.synthetic && <Tag intent="warning" icon="warning-sign" size="large" className="synthetic-tag">Synthetic sample data</Tag>}
             <NavbarDivider />
-            <SegmentedControl
-              size="small"
+            <HTMLSelect
+              aria-label="Day"
               value={date ?? undefined}
-              onValueChange={setDate}
-              options={summary.availableDays.map((d) => ({ label: prettyDate(d), value: d }))}
+              onChange={(e) => setDate(e.currentTarget.value)}
+              options={summary.availableDays.map((d) => {
+                const s = summary.days.find((x) => x.date === d)
+                return { value: d, label: `${prettyDate(d)} · ${s ? `${s.delayed.toLocaleString('en-US')} delayed` : ''}` }
+              })}
             />
           </NavbarGroup>
         </Navbar>

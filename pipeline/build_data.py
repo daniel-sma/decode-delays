@@ -6,7 +6,7 @@ plus hourly ASOS/METAR weather from the Iowa Environmental Mesonet, traces every
 delay actually started, and writes compact JSON for the web app to public/data/.
 
 Usage:
-    python pipeline/build_data.py                          # July 2026, auto-pick worst days
+    python pipeline/build_data.py                          # July 2026, the 6 most disrupted days
     python pipeline/build_data.py --days 2026-07-06,2026-07-07
     python pipeline/build_data.py --zip ~/Downloads/On_Time_...2026_7.zip
     python pipeline/build_data.py --synthetic              # offline fixture, NOT real data
@@ -48,6 +48,7 @@ CATS = ["weather", "airspace", "airline", "security", "untraced"]
 REPORTED = ["carrier", "weather", "nas", "security", "late"]
 
 WX_AIRPORTS = 45  # fetch weather for the busiest N airports
+EXPORT_DAYS = 6  # day files to write when --days isn't given
 MAX_TURN_GAP_MIN = 16 * 60  # longer than this between legs = not the same rotation
 
 
@@ -311,9 +312,9 @@ def build(rows, wx_fetcher, days_arg: str | None, synthetic: bool, source: str):
     if days_arg:
         days = [d.strip() for d in days_arg.split(",")]
     else:
-        worst = max(day_rows, key=lambda d: day_rows[d]["delayed"] + 3 * day_rows[d]["cancelled"])
-        nxt = (date.fromisoformat(worst) + timedelta(days=1)).isoformat()
-        days = [worst] + ([nxt] if nxt in day_rows else [])
+        # The most disrupted days of the month (cancellations weigh 3x a delay), in date order.
+        score = lambda d: day_rows[d]["delayed"] + 3 * day_rows[d]["cancelled"]  # noqa: E731
+        days = sorted(sorted(day_rows, key=score, reverse=True)[:EXPORT_DAYS])
     print(f"Writing days: {', '.join(days)}")
 
     OUT.mkdir(parents=True, exist_ok=True)
@@ -482,7 +483,7 @@ def main():
     ap.add_argument("--year", type=int, default=2026)
     ap.add_argument("--month", type=int, default=7)
     ap.add_argument("--zip", type=Path, help="use an already-downloaded BTS PREZIP file")
-    ap.add_argument("--days", help="comma-separated YYYY-MM-DD days to export (default: worst day + next)")
+    ap.add_argument("--days", help="comma-separated YYYY-MM-DD days to export (default: the 6 most disrupted days)")
     ap.add_argument("--synthetic", action="store_true", help="use the offline synthetic fixture (NOT real data)")
     args = ap.parse_args()
 

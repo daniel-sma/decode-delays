@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
-import { AnchorButton, Card, Classes, H3, HTMLTable, Section, SectionCard, Tag } from '@blueprintjs/core'
+import { useMemo } from 'react'
+import { AnchorButton, Callout, Card, Classes, H3, HTMLTable, Icon, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { CATS, decodedByCat, flightLabel, rootOf, route, sum, type Day } from '../data'
-import { CAT_META, clock, dur, hourLabel } from '../theme'
+import { CAT_META, clock, dur, hourLabel, prettyDate } from '../theme'
 import CauseCompare from './CauseCompare'
 
 const CANCEL = { A: 'Carrier', B: 'Weather', C: 'NAS', D: 'Security' } as Record<string, string>
@@ -49,7 +49,13 @@ export function FlightPanel({ day, index, chain, onSelect }: {
       <>
         Arrived <b>{dur(arr)}</b> late.{' '}
         {ownMin > 0 && <>{dur(ownMin)} started on this flight ({topCat(own)}). </>}
-        {top && (
+        {top && CATS[top[1].c[0]] === 'untraced' && roots.length === 1 ? (
+          <>
+            <b>{dur(inhMin)}</b> was inherited from earlier flights. The trail stops at{' '}
+            <AnchorButton variant="minimal" size="small" intent="primary" className="inline-btn" onClick={() => onSelect(top[0])}>{flightLabel(day, top[0])}</AnchorButton>{' '}
+            at <b>{day.airports[top[1].c[1]]?.code ?? '?'}</b>: the delay it brought in has no cause on file.
+          </>
+        ) : top && (
           <>
             <b>{dur(inhMin)}</b> was inherited
             {top[1].c[4] > 1 ? <>, mostly from {top[1].c[4]} flights earlier</> : <> from the previous flight</>}:{' '}
@@ -62,21 +68,31 @@ export function FlightPanel({ day, index, chain, onSelect }: {
     )
   }
 
+  const dep = f.sdep[index] + (f.depDelay[index] ?? 0)
+  const arrT = f.sarr[index] + (arr ?? 0)
+  const cancelled = status.startsWith('C')
+  const evidence = rootCode ? weatherEvidence(day.weather[rootCode]) : null
+
   return (
     <div className="panel-body">
       <div>
-        <p className="eyebrow">{f.tail[index] || 'No tail number'} · {chain.length} flight{chain.length === 1 ? '' : 's'} today</p>
-        <H3 className="panel-title">{flightLabel(day, index)}</H3>
-        <p className={Classes.TEXT_MUTED}>{route(day, index)} · departs {clock(f.sdep[index])} ET</p>
+        <p className="eyebrow">{f.tail[index] || 'No tail number'} · {prettyDate(day.date)}</p>
+        <H3 className="panel-title">{flightLabel(day, index)} <span className="title-route">{route(day, index)}</span></H3>
       </div>
 
-      <div className="stats">
-        <Stat label="Arrival delay" value={status.startsWith('C') ? 'Cancelled' : arr != null && arr >= 15 ? dur(arr) : 'On time'} />
-        <Stat label="Root cause" value={root ? CAT_META[CATS[root.cat]].short : '—'} color={root ? CAT_META[CATS[root.cat]].color : undefined} />
-        <Stat label="Started at" value={rootCode ?? '—'} />
-      </div>
+      <dl className="times">
+        <dt>Departure</dt>
+        <dd><span className={Classes.TEXT_MUTED}>{clock(f.sdep[index])}</span>{!cancelled && f.depDelay[index] != null && <> → {clock(dep)}</>}</dd>
+        <dt>Arrival</dt>
+        <dd><span className={Classes.TEXT_MUTED}>{clock(f.sarr[index])}</span>{!cancelled && arr != null && <> → {clock(arrT)}</>}</dd>
+        <dt>Delay</dt>
+        <dd>{cancelled ? <Tag minimal intent="danger">Cancelled</Tag> : arr != null && arr >= 15 ? <b className="late">+{dur(arr)}</b> : 'On time'}</dd>
+      </dl>
 
-      <Card compact className="sentence-card"><p className="sentence">{sentence}</p></Card>
+      <Callout className="summary" icon="diagnosis" intent={root ? 'primary' : 'none'} title={root ? `${CAT_META[CATS[root.cat]].label} at ${rootCode}` : 'No root cause recorded'}>
+        <p className="sentence">{sentence}</p>
+        {evidence && <p className="evidence"><Icon icon="cloud" size={12} /> {rootCode}: {evidence}</p>}
+      </Callout>
 
       {f.causes[index] && (
         <Section compact title="Reported vs decoded" icon="comparison">
@@ -84,23 +100,28 @@ export function FlightPanel({ day, index, chain, onSelect }: {
         </Section>
       )}
 
+      <Section compact title="The plane’s day" icon="airplane" subtitle={`${chain.length} flight${chain.length === 1 ? '' : 's'} · select one to trace it`}>
+        <SectionCard>
+          <RippleChain day={day} chain={chain} selected={index} roots={new Set(roots.map(([r]) => r))} onSelect={onSelect} />
+        </SectionCard>
+      </Section>
+
       {contribs.length > 0 && (
-        <Section compact title="Where the minutes came from" icon="flow-linear" subtitle="Each chunk of this flight’s delay, traced to its origin">
+        <Section compact collapsible collapseProps={{ defaultIsOpen: false }} title="Minute-by-minute breakdown" icon="th-list">
           <SectionCard padded={false}>
             <HTMLTable compact interactive className="contrib-table">
               <thead>
                 <tr><th>Cause</th><th>At</th><th>When</th><th>Started on</th><th className="num">Min</th></tr>
               </thead>
               <tbody>
-                {contribs.slice(0, 8).map((c, k) => {
+                {contribs.slice(0, 10).map((c, k) => {
                   const cat = CAT_META[CATS[c[0]]]
-                  const rootFlight = c[2]
                   return (
-                    <tr key={k} onClick={() => rootFlight >= 0 && onSelect(rootFlight)}>
+                    <tr key={k} onClick={() => c[2] >= 0 && onSelect(c[2])}>
                       <td><span className="dot-label"><i style={{ background: cat.color }} />{cat.short}</span></td>
                       <td><strong>{day.airports[c[1]]?.code ?? '?'}</strong></td>
                       <td className="nowrap">{clock(c[3])}</td>
-                      <td className="nowrap">{c[4] === 0 ? 'This flight' : <>{rootFlight >= 0 ? flightLabel(day, rootFlight) : '?'} <span className={Classes.TEXT_MUTED}>({c[4]} back)</span></>}</td>
+                      <td className="nowrap">{c[4] === 0 ? 'This flight' : <>{c[2] >= 0 ? flightLabel(day, c[2]) : '?'} <span className={Classes.TEXT_MUTED}>({c[4]} back)</span></>}</td>
                       <td className="num">{c[5]}</td>
                     </tr>
                   )
@@ -110,38 +131,19 @@ export function FlightPanel({ day, index, chain, onSelect }: {
           </SectionCard>
         </Section>
       )}
-
-      {rootCode && day.weather[rootCode] && <WeatherStrip code={rootCode} wx={day.weather[rootCode]} />}
-
-      <Section compact title="The plane’s day" icon="airplane" subtitle="Hatched = delay brought in from the leg before">
-        <SectionCard>
-          <RippleChain day={day} chain={chain} selected={index} roots={new Set(roots.map(([r]) => r))} onSelect={onSelect} />
-        </SectionCard>
-      </Section>
     </div>
   )
 }
 
-function WeatherStrip({ code, wx }: { code: string; wx: ([number, number, number, string] | null)[] }) {
-  const [hover, setHover] = useState<number | null>(null)
-  const h = hover != null ? wx[hover] : null
-  const stormHours = wx.filter((x) => x?.[0]).length
-  return (
-    <Section compact title={`Weather at ${code}`} icon="cloud" subtitle={stormHours ? `${stormHours} hours with thunderstorms on record` : 'Hourly ASOS / METAR, Eastern time'}>
-      <SectionCard>
-        <div className="wx" onMouseLeave={() => setHover(null)}>
-          {wx.map((x, i) => (
-            <span key={i} className={`wx-cell${x?.[0] ? ' ts' : x?.[1] ? ' ifr' : ''}${x == null ? ' none' : ''}`} onMouseEnter={() => setHover(i)} />
-          ))}
-        </div>
-        <div className="wx-legend">
-          <span><i className="wx-cell ts" /> Thunderstorm</span>
-          <span><i className="wx-cell ifr" /> IFR (vis &lt; 3 mi or ceiling &lt; 1,000 ft)</span>
-        </div>
-        <p className="metar">{h ? <><b>{hourLabel(hover!)} ET</b> {h[3]}</> : hover != null ? 'No observation' : 'Hover an hour to read the METAR.'}</p>
-      </SectionCard>
-    </Section>
-  )
+/** "Thunderstorms 1p–9p ET" style summary of the weather on record at an airport, or null. */
+function weatherEvidence(wx: ([number, number, number, string] | null)[] | undefined): string | null {
+  if (!wx) return null
+  const ts = wx.map((x, h) => (x?.[0] ? h : -1)).filter((h) => h >= 0)
+  const ifr = wx.map((x, h) => (x?.[1] ? h : -1)).filter((h) => h >= 0)
+  const range = (hs: number[]) => `${hourLabel(hs[0])}–${hourLabel(hs[hs.length - 1] + 1)} ET`
+  if (ts.length) return `thunderstorms on record ${range(ts)}`
+  if (ifr.length) return `low ceilings or visibility on record ${range(ifr)}`
+  return 'no adverse weather on record'
 }
 
 export function RippleChain({ day, chain, selected, roots, onSelect }: {

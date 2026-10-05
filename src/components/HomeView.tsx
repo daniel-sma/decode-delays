@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, Collapse, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
+import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root, type Summary } from '../data'
 import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
@@ -70,6 +70,7 @@ export default function HomeView({ day, summary, onDay, onOpenFlight }: Props) {
       render: (i: number) => {
         const r = roots[i]
         if (!r) return ''
+        if (CATS[r.cat] === 'untraced') return <span className={Classes.TEXT_MUTED}>Can’t trace</span>
         return r.hops === 0 ? 'On this flight' : `${r.hops} flight${r.hops > 1 ? 's' : ''} earlier`
       },
     },
@@ -246,11 +247,10 @@ function MonthStrip({ summary, current, onDay }: { summary: Summary; current: st
   )
 }
 
-/** Foundry-style check list: one row per root cause, expandable to the airports behind it. */
+/** Foundry-style check list: one row per root cause, with the airports behind it as filter chips. */
 function RootCauseCheck({ day, roots, filter, onFilter }: {
   day: Day; roots: (Root | null)[]; filter: Filter; onFilter: (f: Filter) => void
 }) {
-  const [open, setOpen] = useState<number | null>(null)
   const groups = useMemo(() => CATS.map((_, c) => {
     const byAp = new Map<number, number>()
     let flights = 0
@@ -259,44 +259,44 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
       flights++
       byAp.set(r.airport, (byAp.get(r.airport) ?? 0) + 1)
     })
-    return { c, flights, minutes: day.totals.decoded[CATS[c]], airports: [...byAp].sort((a, b) => b[1] - a[1]).slice(0, 6) }
+    return { c, flights, minutes: day.totals.decoded[CATS[c]], airports: [...byAp].sort((a, b) => b[1] - a[1]).slice(0, 5) }
   }).filter((g) => g.flights > 0), [day, roots])
 
   return (
-    <Section compact title="Root causes" icon="diagnosis" subtitle="Flights by their biggest root cause · click to filter">
+    <Section compact title="Root causes" icon="diagnosis" subtitle="Flights by their biggest root cause · click a cause or airport to filter">
       <SectionCard padded={false}>
         <ul className="checks">
           {groups.map((g) => {
             const meta = CAT_META[CATS[g.c]]
-            const isOpen = open === g.c
+            const catOn = filter.cat === g.c && filter.airport == null
             return (
               <li key={g.c} className={filter.cat === g.c ? 'on' : ''}>
-                <div className="check-row">
-                  <button className="check-main" onClick={() => onFilter({ cat: filter.cat === g.c ? null : g.c, airport: null })}>
-                    <i className="tag-dot" style={{ background: meta.color }} />
-                    <strong>{meta.label}</strong>
-                    <span className="check-tags">
-                      <Tag minimal round>{fmt(g.flights)} flights</Tag>
-                      <Tag minimal round>{dur(g.minutes)}</Tag>
-                    </span>
-                  </button>
-                  <Button variant="minimal" size="small" icon={isOpen ? 'chevron-up' : 'chevron-down'} aria-label={`Airports behind ${meta.label}`} onClick={() => setOpen(isOpen ? null : g.c)} />
-                </div>
-                <Collapse isOpen={isOpen}>
-                  <div className="check-detail">
-                    {g.airports.map(([ap, n]) => (
+                <button className="check-main" aria-pressed={catOn} onClick={() => onFilter(catOn ? { cat: null, airport: null } : { cat: g.c, airport: null })}>
+                  <i className="tag-dot" style={{ background: meta.color }} />
+                  <strong>{meta.label}</strong>
+                  <span className="check-tags">
+                    <Tag minimal round>{fmt(g.flights)} flights</Tag>
+                    <Tag minimal round>{dur(g.minutes)}</Tag>
+                  </span>
+                </button>
+                <div className="check-detail">
+                  {g.airports.map(([ap, n]) => {
+                    const on = filter.cat === g.c && filter.airport === ap
+                    return (
                       <Tag
                         key={ap}
                         interactive
-                        minimal={filter.airport !== ap}
-                        intent={filter.airport === ap ? 'primary' : 'none'}
-                        onClick={() => onFilter({ cat: g.c, airport: filter.airport === ap ? null : ap })}
+                        round
+                        minimal={!on}
+                        intent={on ? 'primary' : 'none'}
+                        className="ap-chip"
+                        onClick={() => onFilter(on ? { cat: g.c, airport: null } : { cat: g.c, airport: ap })}
                       >
-                        {day.airports[ap].code} · {n}
+                        <strong>{day.airports[ap].code}</strong> {n}
                       </Tag>
-                    ))}
-                  </div>
-                </Collapse>
+                    )
+                  })}
+                </div>
               </li>
             )
           })}
