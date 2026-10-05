@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useHotkeys } from '@blueprintjs/core'
 import { tailChain, type Day } from '../data'
 import FlightMap from './FlightMap'
 import Scrubber, { actualArr, actualDep, chainWindow } from './Scrubber'
 import { FlightPanel } from './Panels'
+import Hotkeys from './Hotkeys'
 
 const TICK_MS = 100 // at 1x, one simulated minute per tick
 
@@ -59,10 +59,10 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
     { combo: 'up', label: 'Previous flight of this aircraft', global: true, group: 'Flight', preventDefault: true, onKeyDown: () => step.current(-1) },
     { combo: 'down', label: 'Next flight of this aircraft', global: true, group: 'Flight', preventDefault: true, onKeyDown: () => step.current(1) },
   ], [])
-  useHotkeys(hotkeys)
 
   return (
     <main className="flight-page">
+      <Hotkeys config={hotkeys} />
       <div className="flight-stage">
         <div className="map-wrap">
           <FlightMap day={day} chain={chain} selected={selected} time={time} onSelect={pick} />

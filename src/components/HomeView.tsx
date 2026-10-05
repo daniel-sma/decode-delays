@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, useHotkeys } from '@blueprintjs/core'
+import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
 import { CAT_META, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
 import { RippleChain, Stat, statusTag } from './Panels'
 import type { IconName } from '@blueprintjs/icons'
 import CatLabel from './CatLabel'
+import Hotkeys from './Hotkeys'
 import { RootCauseMenu, SearchFilterMenu, SimpleFilterMenu, type Choice } from './HeaderMenus'
 
 interface Props {
@@ -178,6 +179,16 @@ export default function HomeView({ day, onOpenFlight }: Props) {
   const extra = Math.max(0, cardWidth - sum(columns.map((c) => c.width)) - SCROLLBAR)
   const widths = columns.map((c) => c.width + (c.name === 'BTS reported' || c.name === 'Decoded root cause' ? extra / 2 : 0))
 
+  // Built once per change: Blueprint's InputGroup re-measures its right element whenever the element changes,
+  // and a fresh element on every render made that measuring loop forever once the table re-rendered.
+  const hasQuery = q !== ''
+  const searchActions = useMemo(() => (filtersSet || hasQuery) ? (
+    <span className="search-meta">
+      {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
+      {hasQuery && <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} />}
+    </span>
+  ) : undefined, [filtersSet, hasQuery])
+
   // Keyboard: up / down move a highlighted row (from the search box too), Enter opens it, "/" jumps to search.
   const searchRef = useRef<HTMLInputElement>(null)
   const [cursor, setCursor] = useState<number | null>(null) // keyboard-highlighted row
@@ -228,7 +239,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       k('/', 'Search', () => searchRef.current?.focus(), false),
     ]
   }, [])
-  useHotkeys(hotkeys)
 
   const onSelection = (regions: Region[]) => {
     setSelected(regions)
@@ -238,6 +248,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
 
   return (
     <div className="home">
+      <Hotkeys config={hotkeys} />
       <div className="home-main">
         <div className="kpis">
             <Stat icon="dollar" label="Est. delay cost" value={cost(repTotal)} />
@@ -257,12 +268,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
               placeholder="Search a tail number or a flight number, e.g. WN 4067 or N7740A"
               value={q}
               onValueChange={(v) => { setQ(v); setSelected([]) }}
-              rightElement={(filtersSet || q) ? (
-                <span className="search-meta">
-                  {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
-                  {q && <Button variant="minimal" icon="cross" aria-label="Clear search" onClick={() => setQ('')} />}
-                </span>
-              ) : undefined}
+              rightElement={searchActions}
               spellCheck={false}
             />
             {singleTail && rows.length > 0 && (

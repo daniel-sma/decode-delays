@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { Button, Tooltip, useHotkeys } from '@blueprintjs/core'
+import { Button, Tooltip } from '@blueprintjs/core'
+import Hotkeys from './Hotkeys'
 import { flightLabel, route, type Day } from '../data'
 import { dur } from '../theme'
 
@@ -131,10 +132,10 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
       k('home', 'Start of day', () => keys.current.start()),
     ]
   }, [])
-  useHotkeys(hotkeys)
 
   return (
     <div className="scrubber">
+      <Hotkeys config={hotkeys} />
       <div className="scrub-bar">
         <div className="scrub-clock">
           <span className="scrub-time">{clock24(time)}</span>
