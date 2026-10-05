@@ -104,6 +104,9 @@ const WHITE: RGBA = [241, 241, 242, 255] // --map-selected
 // Map marker: the plane artwork faces east (nose right), so it turns by 90° less than the bearing.
 const PLANE = `${import.meta.env.BASE_URL}brand/plane.png`
 const PLANE_HEADING = 90
+// Airport pin on the map: an icon tile and the tail under it that points at the airport
+const PIN = 26
+const PIN_TAIL = 6
 
 const FONT = getComputedStyle(document.body).fontFamily
 const COUNTRY_SIZE = 12
@@ -198,24 +201,35 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const labels = useMemo(() => {
     if (!viewport) return []
     // The selected leg's two airports first, then the rest; each takes the first spot that doesn't collide.
+    // The selected airports also get a pin (an icon tile whose tail points at the airport), placed first.
     const order = [s.o, s.d, ...airports.filter((a) => a !== s.o && a !== s.d)]
     const placed: { x: number; y: number; w: number; h: number }[] = []
     const hit = (b: { x: number; y: number; w: number; h: number }) =>
       placed.some((o) => b.x < o.x + o.w + 4 && b.x + b.w + 4 > o.x && b.y < o.y + o.h + 4 && b.y + b.h + 4 > o.y)
-    return order.map((ap) => {
+    // Project onto whichever world copy is nearest the view centre (the map repeats horizontally).
+    const at = (ap: number) => {
       const a = day.airports[ap]
-      // Project onto whichever world copy is nearest the view centre (the map repeats horizontally).
-      const lon = a.lon + 360 * Math.round((view.longitude - a.lon) / 360)
-      const [x, y] = viewport.project([lon, a.lat])
+      return viewport.project([a.lon + 360 * Math.round((view.longitude - a.lon) / 360), a.lat])
+    }
+    const pins = [s.o, s.d].map((ap) => { const [x, y] = at(ap); return { x: x - PIN / 2, y: y - PIN - PIN_TAIL, w: PIN, h: PIN + PIN_TAIL } })
+    placed.push(...pins)
+    return order.map((ap) => {
+      const [x, y] = at(ap)
       const detail = ap === s.o || ap === s.d
-      const w = detail ? 150 : 44, h = detail ? 40 : 18, g = 8
-      const spots = [
-        { x: x - w / 2, y: y - h - g }, { x: x - w / 2, y: y + g }, { x: x + g, y: y - h / 2 }, { x: x - w - g, y: y - h / 2 },
-        { x: x + g, y: y - h - g }, { x: x - w - g, y: y + g }, { x: x + g, y: y + g }, { x: x - w - g, y: y - h - g },
-      ]
+      const w = detail ? 196 : 44, h = detail ? 44 : 18, g = 8
+      const spots = detail
+        ? [
+            { x: x + PIN / 2 + g, y: y - h }, { x: x - PIN / 2 - g - w, y: y - h }, { x: x - w / 2, y: y + g },
+            { x: x + g, y: y + g }, { x: x - w - g, y: y + g }, { x: x - w / 2, y: y - PIN - PIN_TAIL - h - g },
+          ]
+        : [
+            { x: x - w / 2, y: y - h - g }, { x: x - w / 2, y: y + g }, { x: x + g, y: y - h / 2 }, { x: x - w - g, y: y - h / 2 },
+            { x: x + g, y: y - h - g }, { x: x - w - g, y: y + g }, { x: x + g, y: y + g }, { x: x - w - g, y: y - h - g },
+          ]
       const spot = spots.find((p) => !hit({ ...p, w, h })) ?? spots[0]
       placed.push({ ...spot, w, h })
-      return { ap, detail, box: { ...spot, w, h } }
+      const pin = detail ? pins[ap === s.o ? 0 : 1] : null
+      return { ap, detail, box: { ...spot, w, h }, pin }
     })
   }, [viewport, airports, day, s.o, s.d, view.longitude])
 
@@ -226,9 +240,9 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     const showStates = view.zoom >= STATE_ZOOM
     const near = (lon: number) => lon + 360 * Math.round((view.longitude - lon) / 360)
     // Airport dots and their code / detail cards are taken first.
-    const taken = labels.flatMap(({ ap, box }) => {
+    const taken = labels.flatMap(({ ap, box, pin }) => {
       const [x, y] = viewport.project([near(day.airports[ap].lon), day.airports[ap].lat])
-      return [box, { x: x - 8, y: y - 8, w: 16, h: 16 }]
+      return [box, { x: x - 8, y: y - 8, w: 16, h: 16 }, ...(pin ? [pin] : [])]
     })
     const cands = [
       ...world.labels.filter((l) => !(showStates && l.name === 'United States')),
@@ -325,21 +339,25 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
         } : null}
       />
       <div className="map-labels" aria-hidden>
+        {labels.map(({ ap, pin }) => pin && (
+          <span key={`pin-${ap}`} className="map-pin" style={{ left: pin.x, top: pin.y }}>
+            <Icon icon={ap === s.o ? 'map-marker' : 'flag'} size={14} />
+          </span>
+        ))}
         {labels.map(({ ap, detail, box }) => {
           const code = day.airports[ap].code
           if (!detail) return <span key={ap} className="map-label" style={{ left: box.x, top: box.y, width: box.w }}>{code}</span>
           const isOrigin = ap === s.o
           const late = isOrigin ? f.depDelay[selected] : f.arrDelay[selected]
           return (
-            <div key={ap} className="map-callout" style={{ left: box.x, top: box.y, width: box.w }}>
-              <div className="map-callout-head">
-                <Icon icon={isOrigin ? 'map-marker' : 'flag'} size={12} />
-                <strong>{code}</strong>
-                <span>{isOrigin ? 'Departs' : 'Arrives'}</span>
-              </div>
-              <div className="map-callout-row">
-                {cancelled ? 'Cancelled' : <>{clock(isOrigin ? dep : arr)}{late != null && late >= 15 && <b className={late >= SEVERE_MIN ? 'late severe' : 'late'}> +{dur(late)}</b>}</>}
-              </div>
+            <div key={ap} className="map-callout" style={{ left: box.x, top: box.y, width: box.w, height: box.h }}>
+              <span className="map-callout-icon"><Icon icon={isOrigin ? 'map-marker' : 'flag'} size={14} /></span>
+              <span className="map-callout-text">
+                <span className="map-callout-head"><strong>{code}</strong><span>{isOrigin ? 'Departs' : 'Arrives'}</span></span>
+                <span className="map-callout-row">
+                  {cancelled ? 'Cancelled' : <>{clock(isOrigin ? dep : arr)}{late != null && late >= 15 && <b className={late >= SEVERE_MIN ? 'late severe' : 'late'}> +{dur(late)}</b>}</>}
+                </span>
+              </span>
             </div>
           )
         })}
