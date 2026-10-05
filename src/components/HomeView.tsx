@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
+import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, useHotkeys } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
 import { CAT_META, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
@@ -26,6 +26,7 @@ const SORT: Choice<'desc' | 'asc'>[] = [
 
 // Width reserved for the table's vertical scrollbar so columns never overflow sideways.
 const SCROLLBAR = 16
+const ROW_H = 30
 
 interface Col {
   name: string
@@ -176,6 +177,58 @@ export default function HomeView({ day, onOpenFlight }: Props) {
   const extra = Math.max(0, cardWidth - sum(columns.map((c) => c.width)) - SCROLLBAR)
   const widths = columns.map((c) => c.width + (c.name === 'BTS reported' || c.name === 'Decoded root cause' ? extra / 2 : 0))
 
+  // Keyboard: up / down move a highlighted row (from the search box too), Enter opens it, "/" jumps to search.
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [cursor, setCursor] = useState<number | null>(null) // keyboard-highlighted row
+  useEffect(() => setCursor(null), [rows])
+  const keys = useRef({ move: (_d: number) => {}, open: () => {}, page: (): number => 1 })
+  keys.current = {
+    page: () => {
+      const box = cardRef.current?.querySelector<HTMLElement>('.bp6-table-quadrant-main .bp6-table-quadrant-scroll-container')
+      return box ? Math.max(1, Math.floor(box.clientHeight / ROW_H) - 2) : 10
+    },
+    move: (d) => {
+      if (!rows.length) return
+      const r = Math.max(0, Math.min(rows.length - 1, cursor == null ? (d > 0 ? 0 : rows.length - 1) : cursor + d))
+      setCursor(r)
+      // Scroll only when the row leaves the view: to the top going up, to the bottom going down.
+      const box = cardRef.current?.querySelector<HTMLElement>('.bp6-table-quadrant-main .bp6-table-quadrant-scroll-container')
+      if (box) {
+        const head = box.querySelector<HTMLElement>('.bp6-table-column-headers')?.offsetHeight ?? 0
+        const top = r * ROW_H, bottom = top + ROW_H, view = box.clientHeight - head
+        if (top < box.scrollTop) box.scrollTop = top
+        else if (bottom > box.scrollTop + view) box.scrollTop = bottom - view
+      }
+    },
+    open: () => { if (cursor != null && rows[cursor] != null) onOpenFlight(rows[cursor]) },
+  }
+  const hotkeys = useMemo(() => {
+    // A column filter menu that's open handles its own arrow keys.
+    const menuOpen = () => document.querySelector('.bp6-popover .bp6-menu') != null
+    const k = (combo: string, label: string, run: () => void, allowInInput = true) => ({
+      combo, label, global: true, group: 'Delays table', allowInInput, preventDefault: true,
+      onKeyDown: () => { if (!menuOpen()) run() },
+    })
+    return [
+      k('down', 'Next row', () => keys.current.move(1)),
+      k('up', 'Previous row', () => keys.current.move(-1)),
+      k('pagedown', 'Down a page', () => keys.current.move(keys.current.page())),
+      k('pageup', 'Up a page', () => keys.current.move(-keys.current.page())),
+      {
+        // Enter on a focused button or tab keeps its own meaning; otherwise it opens the highlighted row.
+        combo: 'enter', label: 'Open the highlighted flight', global: true, group: 'Delays table', allowInInput: true,
+        onKeyDown: (e: KeyboardEvent) => {
+          const el = document.activeElement
+          if (menuOpen() || (el && el !== document.body && el !== searchRef.current && !el.closest('.bp6-table-container'))) return
+          e.preventDefault()
+          keys.current.open()
+        },
+      },
+      k('/', 'Search', () => searchRef.current?.focus(), false),
+    ]
+  }, [])
+  useHotkeys(hotkeys)
+
   const onSelection = (regions: Region[]) => {
     setSelected(regions)
     const row = regions[0]?.rows?.[0]
@@ -198,6 +251,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
           <SectionCard padded>
             <InputGroup
               size="large"
+              inputRef={searchRef}
               leftIcon="search"
               placeholder="Search a tail number or a flight number, e.g. WN 4067 or N7740A"
               value={q}
@@ -230,8 +284,8 @@ export default function HomeView({ day, onOpenFlight }: Props) {
                 selectedRegionTransform={(region) => ({ rows: region.rows ?? [0, 0] })}
                 selectedRegions={selected}
                 onSelection={onSelection}
-                defaultRowHeight={30}
-                cellRendererDependencies={[rows, filter]}
+                defaultRowHeight={ROW_H}
+                cellRendererDependencies={[rows, filter, cursor]}
               >
                 {columns.map((c) => (
                   <Column
@@ -248,7 +302,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
                         )}
                       />
                     )}
-                    cellRenderer={(r) => <Cell className={c.className} interactive>{c.render(rows[r])}</Cell>}
+                    cellRenderer={(r) => <Cell className={`${c.className ?? ''}${r === cursor ? ' row-cursor' : ''}`} interactive>{c.render(rows[r])}</Cell>}
                   />
                 ))}
               </Table2>

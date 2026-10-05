@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useHotkeys } from '@blueprintjs/core'
 import { tailChain, type Day } from '../data'
 import FlightMap from './FlightMap'
 import Scrubber, { actualArr, actualDep, chainWindow } from './Scrubber'
@@ -50,6 +51,15 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
     setSelected(i)
     if (!day.flights.status[i].startsWith('C')) setTime(actualDep(day, i))
   }
+
+  // Up / down step through this aircraft's flights, like the sidebar list.
+  const step = useRef((_d: number) => {})
+  step.current = (d: number) => { const k = chain.indexOf(selected) + d; if (k >= 0 && k < chain.length) pick(chain[k]) }
+  const hotkeys = useMemo(() => [
+    { combo: 'up', label: 'Previous flight of this aircraft', global: true, group: 'Flight', preventDefault: true, onKeyDown: () => step.current(-1) },
+    { combo: 'down', label: 'Next flight of this aircraft', global: true, group: 'Flight', preventDefault: true, onKeyDown: () => step.current(1) },
+  ], [])
+  useHotkeys(hotkeys)
 
   return (
     <main className="flight-page">

@@ -95,10 +95,15 @@ Palantir's open-source React toolkit for data-dense interfaces, in its dark them
 
 The look follows Palantir's operational design language (Gotham, Foundry, Apollo) on Blueprint's dark theme:
 dense but aligned panels told apart by background and 1px borders rather than shadows, small uppercase section
-headers, workspace tabs in the top bar, square corners, monospace for times and identifiers, status shown as
+headers, workspace tabs in the top bar, square corners, one typeface with tabular figures for times and numbers, status shown as
 Blueprint intent tags (ON TIME, +2h 13m, CANCELLED), and causes identified by icons and labels, never colour
 alone. The flight page puts a list-style sidebar on the left and a satellite map with an ops-console playback
 scrubber on the right.
+
+**Keyboard:** press `?` anywhere for the list. On the delays table, `↑`/`↓` (also from the search box) move a
+highlighted row, `PgUp`/`PgDn` move a page, `Enter` opens the flight and `/` jumps to search. On a flight page,
+`Space` plays or pauses, `←`/`→` step 5 min (`Shift` for 15), `[`/`]` jump to the previous or next departure or
+arrival, `-`/`=` change speed, `Home` returns to the start of the day, and `↑`/`↓` step through the aircraft's flights.
 
 The map's satellite base is NASA Blue Marble (public domain), cropped to the US and reprojected to Web
 Mercator by `pipeline/make_basemap.py` and bundled at `public/basemap/conus.jpg`. Where the browser can reach

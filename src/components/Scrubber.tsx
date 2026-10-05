@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Button, Tag, Tooltip } from '@blueprintjs/core'
+import { Button, Tooltip, useHotkeys } from '@blueprintjs/core'
 import { flightLabel, route, type Day } from '../data'
 import { dur } from '../theme'
 
@@ -107,6 +107,31 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
   for (let t = Math.ceil(win.t0 / minorEvery) * minorEvery; t <= win.t1; t += minorEvery) if (t % labelEvery) minors.push(t)
   const now = lateness(day, legs, time)
 
+  const togglePlay = () => { if (!playing && time >= win.t1) onTime(win.t0); onPlay(!playing) }
+  const slower = () => si > 0 && onSpeed(SPEEDS[si - 1])
+  const faster = () => si < SPEEDS.length - 1 && onSpeed(SPEEDS[si + 1])
+  // Keyboard playback anywhere on the flight page ("?" lists every shortcut). The hotkeys are registered
+  // once and call the latest handlers through a ref, so playback ticks don't re-register them.
+  const keys = useRef({ togglePlay, slower, faster, prevEvent, nextEvent, step: (d: number) => onTime(clamp(time + d)), start: () => onTime(win.t0) })
+  keys.current = { togglePlay, slower, faster, prevEvent, nextEvent, step: (d: number) => onTime(clamp(time + d)), start: () => onTime(win.t0) }
+  const hotkeys = useMemo(() => {
+    const k = (combo: string, label: string, run: () => void) =>
+      ({ combo, label, global: true, group: 'Playback', preventDefault: true, onKeyDown: run })
+    return [
+      k('space', 'Play / pause', () => keys.current.togglePlay()),
+      k('left', 'Back 5 min', () => keys.current.step(-5)),
+      k('right', 'Forward 5 min', () => keys.current.step(5)),
+      k('shift+left', 'Back 15 min', () => keys.current.step(-15)),
+      k('shift+right', 'Forward 15 min', () => keys.current.step(15)),
+      k('[', 'Previous departure or arrival', () => keys.current.prevEvent()),
+      k(']', 'Next departure or arrival', () => keys.current.nextEvent()),
+      k('-', 'Slower', () => keys.current.slower()),
+      k('=', 'Faster', () => keys.current.faster()),
+      k('home', 'Start of day', () => keys.current.start()),
+    ]
+  }, [])
+  useHotkeys(hotkeys)
+
   return (
     <div className="scrubber">
       <div className="scrub-bar">
@@ -117,17 +142,16 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
           <span className="scrub-late">{now.late >= 1 ? <>Running <b>{dur(now.late)}</b> late</> : 'On schedule'}</span>
         </div>
         <div className="scrub-transport">
-          <Tooltip content="Start of day" placement="top"><Button variant="minimal" size="small" icon="step-backward" onClick={() => onTime(win.t0)} aria-label="Start of day" /></Tooltip>
-          <Tooltip content="Slower" placement="top"><Button variant="minimal" size="small" icon="fast-backward" text={`${SPEEDS[Math.max(0, si - 1)]}x`} disabled={si <= 0} onClick={() => onSpeed(SPEEDS[si - 1])} /></Tooltip>
-          <Tooltip content="Back 15 min" placement="top"><Button variant="minimal" size="small" icon="undo" text="15m" onClick={() => onTime(clamp(time - 15))} /></Tooltip>
-          <Tooltip content="Previous departure or arrival" placement="top"><Button variant="minimal" size="small" icon="chevron-left" onClick={prevEvent} aria-label="Previous event" /></Tooltip>
-          <Button intent="primary" size="small" icon={playing ? 'pause' : 'play'} text={playing ? 'Pause' : 'Play'} className="scrub-play" onClick={() => { if (!playing && time >= win.t1) onTime(win.t0); onPlay(!playing) }} />
-          <Tooltip content="Next departure or arrival" placement="top"><Button variant="minimal" size="small" icon="chevron-right" onClick={nextEvent} aria-label="Next event" /></Tooltip>
-          <Tooltip content="Forward 15 min" placement="top"><Button variant="minimal" size="small" icon="redo" text="15m" onClick={() => onTime(clamp(time + 15))} /></Tooltip>
-          <Tooltip content="Faster" placement="top"><Button variant="minimal" size="small" rightIcon="fast-forward" text={`${SPEEDS[Math.min(SPEEDS.length - 1, si + 1)]}x`} disabled={si >= SPEEDS.length - 1} onClick={() => onSpeed(SPEEDS[si + 1])} /></Tooltip>
+          <Tooltip content="Start of day · Home" placement="top"><Button variant="minimal" size="small" icon="step-backward" onClick={() => onTime(win.t0)} aria-label="Start of day" /></Tooltip>
+          <Tooltip content="Slower · −" placement="top"><Button variant="minimal" size="small" icon="fast-backward" text={`${SPEEDS[Math.max(0, si - 1)]}x`} disabled={si <= 0} onClick={() => onSpeed(SPEEDS[si - 1])} /></Tooltip>
+          <Tooltip content="Back 15 min · Shift+←" placement="top"><Button variant="minimal" size="small" icon="undo" text="15m" onClick={() => onTime(clamp(time - 15))} /></Tooltip>
+          <Tooltip content="Previous departure or arrival · [" placement="top"><Button variant="minimal" size="small" icon="chevron-left" onClick={prevEvent} aria-label="Previous event" /></Tooltip>
+          <Button intent="primary" size="small" icon={playing ? 'pause' : 'play'} text={playing ? 'Pause' : 'Play'} className="scrub-play" onClick={togglePlay} title="Play / pause · Space" />
+          <Tooltip content="Next departure or arrival · ]" placement="top"><Button variant="minimal" size="small" icon="chevron-right" onClick={nextEvent} aria-label="Next event" /></Tooltip>
+          <Tooltip content="Forward 15 min · Shift+→" placement="top"><Button variant="minimal" size="small" icon="redo" text="15m" onClick={() => onTime(clamp(time + 15))} /></Tooltip>
+          <Tooltip content="Faster · =" placement="top"><Button variant="minimal" size="small" rightIcon="fast-forward" text={`${SPEEDS[Math.min(SPEEDS.length - 1, si + 1)]}x`} disabled={si >= SPEEDS.length - 1} onClick={() => onSpeed(SPEEDS[si + 1])} /></Tooltip>
         </div>
         <div className="scrub-meta">
-          <Tag minimal className="scrub-tag">ARCHIVED</Tag>
           <span className="scrub-speed">{speed}x</span>
         </div>
       </div>
@@ -149,11 +173,6 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
           aria-valuenow={Math.round(time)}
           aria-valuetext={`${clock24(time)} ET`}
           tabIndex={0}
-          onKeyDown={(e) => {
-            if (e.key === 'ArrowLeft') onTime(clamp(time - (e.shiftKey ? 15 : 5)))
-            if (e.key === 'ArrowRight') onTime(clamp(time + (e.shiftKey ? 15 : 5)))
-            if (e.key === ' ') { e.preventDefault(); onPlay(!playing) }
-          }}
         >
           <div className="scrub-ruler">
             {minors.map((t) => <span key={t} className="tick minor" style={{ left: pct(t) }} />)}
