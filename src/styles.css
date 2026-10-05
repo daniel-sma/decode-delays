@@ -5,39 +5,39 @@
    Spacing scale: 4 / 8 / 12 / 16 / 20. */
 :root {
   color-scheme: dark;
-  /* Graphite neutrals with one muted purple accent. Purple marks interaction, selection, focus and active
+  /* Cool slate neutrals with one muted blue accent. The accent marks interaction, selection, focus and active
      states only; status colours stay semantic (green / amber / red). */
-  --page: #17181c;
-  --panel: #202126;
-  --section-head: #292a30;
-  --card: #25262b;
-  --hover: #303138;
-  --line: #303137;
-  --line-strong: #45464d;
-  --map-frame: #101116;
-  --text: #f1f1f2;
-  --text-muted: #a5a5aa;
-  --text-faint: #7f8087;
-  --accent: #8067b7;
-  --accent-light: #a48bd0;
-  --selection: rgba(128, 103, 183, 0.2);
-  --on-time: #55a87a;
-  --late: #c99655;
+  --page: #171b21;
+  --panel: #20262e;
+  --section-head: #29313b;
+  --card: #252c35;
+  --hover: #303945;
+  --line: #303943;
+  --line-strong: #46515e;
+  --map-frame: #11151a;
+  --text: #f1f3f5;
+  --text-muted: #a8b0ba;
+  --text-faint: #7f8995;
+  --accent: #3f6fae;
+  --accent-light: #5a87c2;
+  --selection: rgba(63, 111, 174, 0.2);
+  --on-time: #55a879;
+  --late: #c99a55;
   --severe: #c96870;
-  --header-bg: #191a1e;
-  --header-border: #303137;
-  --header-divider: #3b3c42;
-  --tab-text: #96979d;
-  --tab-icon: #85868d;
-  --tab-hover: #24252a;
-  --tab-active-bg: #28292f;
-  --tab-active-edge: #3b3943;
-  --tab-active-accent: #8067b7;
-  --map-on-time: #55a87a;
-  --map-late: #c99655;
+  --header-bg: #1a2027;
+  --header-border: #303943;
+  --header-divider: #3b4652;
+  --tab-text: #9aa4af;
+  --tab-icon: #818c98;
+  --tab-hover: #252c34;
+  --tab-active-bg: #2d3742;
+  --tab-active-edge: #3a4653;
+  --tab-active-accent: #3f6fae;
+  --map-on-time: #55a879;
+  --map-late: #c99a55;
   --map-severe: #c96870;
-  --map-selected: #f1f1f2;
-  --map-upcoming: rgba(241, 241, 242, 0.4);
+  --map-selected: #f1f3f5;
+  --map-upcoming: rgba(241, 243, 245, 0.4);
   --map-borders: rgba(255, 255, 255, 0.12);
 
   /* Short names used through this file */
@@ -56,15 +56,15 @@
   --danger: var(--severe);
 
   /* Blueprint's own tokens follow the same palette */
-  --bp-intent-primary-rest: #8067b7;
-  --bp-intent-primary-hover: #6f58a3;
-  --bp-intent-primary-active: #5e4a8c;
-  --bp-intent-primary-disabled: #a48bd0;
+  --bp-intent-primary-rest: #3f6fae;
+  --bp-intent-primary-hover: #36609a;
+  --bp-intent-primary-active: #2e5285;
+  --bp-intent-primary-disabled: #5a87c2;
   --bp-intent-primary-foreground: #ffffff;
-  --bp-intent-success-rest: #55a87a;
-  --bp-intent-warning-rest: #c99655;
+  --bp-intent-success-rest: #55a879;
+  --bp-intent-warning-rest: #c99a55;
   --bp-intent-danger-rest: #c96870;
-  --bp-emphasis-focus-color: rgba(164, 139, 208, 0.6);
+  --bp-emphasis-focus-color: rgba(90, 135, 194, 0.6);
 
   --s-1: 4px;
   --s-2: 8px;
@@ -236,10 +236,10 @@ span.ws-tab { padding: 0; }
 
 /* map overlays */
 .map-tools.bp6-button-group { position: absolute; top: var(--s-3); right: var(--s-3); box-shadow: 0 0 0 1px var(--line); }
-.map-tools .bp6-button { background: rgba(32, 33, 38, 0.92) !important; }
+.map-tools .bp6-button { background: rgba(32, 38, 46, 0.92) !important; }
 .map-tools .bp6-button .bp6-icon { color: var(--ink-2); }
 .map-tools .bp6-button:hover { background: var(--bg-hover) !important; }
-.map-legend { position: absolute; left: var(--s-3); bottom: var(--s-3); display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); padding: 6px var(--s-3); font-size: 11px; background: rgba(32, 33, 38, 0.92); box-shadow: inset 0 0 0 1px var(--line); }
+.map-legend { position: absolute; left: var(--s-3); bottom: var(--s-3); display: flex; flex-wrap: wrap; gap: var(--s-1) var(--s-4); padding: 6px var(--s-3); font-size: 11px; background: rgba(32, 38, 46, 0.92); box-shadow: inset 0 0 0 1px var(--line); }
 .map-legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); }
 .map-legend i { width: 16px; height: 3px; display: inline-block; }
 .map-legend i.sel { background: var(--map-selected); height: 4px; }
@@ -247,7 +247,7 @@ span.ws-tab { padding: 0; }
 .map-credit { position: absolute; right: var(--s-2); bottom: var(--s-1); font-size: 11px; color: rgba(255, 255, 255, 0.45); text-shadow: 0 1px 2px #000; }
 .map-labels { position: absolute; inset: 0; pointer-events: none; }
 .map-label { position: absolute; height: 18px; display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--ink-1); text-shadow: 0 0 3px #000, 0 1px 2px #000; letter-spacing: 0.02em; }
-.map-callout { position: absolute; box-sizing: border-box; padding: 5px var(--s-2); background: rgba(32, 33, 38, 0.94); box-shadow: inset 0 0 0 1px var(--line-strong); font-size: 11px; }
+.map-callout { position: absolute; box-sizing: border-box; padding: 5px var(--s-2); background: rgba(32, 38, 46, 0.94); box-shadow: inset 0 0 0 1px var(--line-strong); font-size: 11px; }
 .map-callout-head { display: flex; align-items: center; gap: 6px; }
 .map-callout-head .bp6-icon { color: var(--ink-2); }
 .map-callout-head strong { font-size: 13px; }
@@ -385,7 +385,7 @@ span.ws-tab { padding: 0; }
 .facts-wrap { padding-top: var(--s-3); border-bottom: 1px solid var(--line); }
 .fact-sub { font-size: 11px; font-weight: 400; color: var(--ink-3); }
 
-/* ---------- header: brand, then full-height workspace tabs; the active tab has a thin purple edge */
+/* ---------- header: brand, then full-height workspace tabs; the active tab has a thin accent edge */
 .topbar.bp6-navbar { height: 56px; padding: 0 0 0 20px; background: var(--header-bg); box-shadow: inset 0 -1px 0 var(--header-border); }
 .topbar .bp6-navbar-group { height: 56px; gap: 0; }
 .brand.bp6-navbar-heading { gap: 10px; font-size: 16px; font-weight: 600; letter-spacing: 0.005em; color: var(--text); margin-right: 0; }
@@ -413,12 +413,12 @@ span.ws-tab { padding: 0; }
 .bp6-table-th-menu-container-background { display: none; }
 
 /* ---------- status tags: muted semantic colours, square, thin outline */
-.status-tag.bp6-tag.bp6-intent-success { background: rgba(85, 168, 122, 0.14); color: var(--on-time); box-shadow: inset 0 0 0 1px rgba(85, 168, 122, 0.32); }
-.status-tag.bp6-tag.bp6-intent-warning { background: rgba(201, 150, 85, 0.14); color: var(--late); box-shadow: inset 0 0 0 1px rgba(201, 150, 85, 0.32); }
+.status-tag.bp6-tag.bp6-intent-success { background: rgba(85, 168, 121, 0.14); color: var(--on-time); box-shadow: inset 0 0 0 1px rgba(85, 168, 121, 0.32); }
+.status-tag.bp6-tag.bp6-intent-warning { background: rgba(201, 154, 85, 0.14); color: var(--late); box-shadow: inset 0 0 0 1px rgba(201, 154, 85, 0.32); }
 .status-tag.bp6-tag.bp6-intent-danger { background: rgba(201, 104, 112, 0.14); color: var(--severe); box-shadow: inset 0 0 0 1px rgba(201, 104, 112, 0.32); }
 .bp6-dark .bp6-tag.bp6-minimal:not([class*='bp6-intent']) { background: rgba(255, 255, 255, 0.06); color: var(--ink-2); }
 
-/* ---------- neutral graphite controls; purple stays for the primary action, selection and focus */
+/* ---------- neutral slate controls; the accent stays for the primary action, selection and focus */
 .bp6-dark .bp6-button:not([class*='bp6-intent']):not(.bp6-minimal) { background: var(--bg-row); box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--ink-1); }
 .bp6-dark .bp6-button:not([class*='bp6-intent']):not(.bp6-minimal):hover { background: var(--bg-hover); }
 .bp6-dark .bp6-button:not([class*='bp6-intent']) .bp6-icon { color: var(--ink-2); }
