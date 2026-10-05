@@ -478,3 +478,9 @@ span.ws-tab { padding: 0; }
 .events li + li::before { display: none; }
 .events li > .bp6-icon { margin-top: 0; }
 .ev-time { font-size: 12px; white-space: nowrap; }
+
+/* Cost breakdown lines and the event log are plain lines, not boxes. They keep the boxes' 12px inset so
+   their icons line up with the icons in the boxes above, and the same 8px gap between lines. */
+.row.static.sub, .events li { min-height: 28px; padding: 0 var(--s-3); background: transparent; box-shadow: none; }
+.row.static.sub .row-main span { color: var(--ink-2); }
+.events li { color: var(--ink-2); }
