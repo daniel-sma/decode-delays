@@ -174,4 +174,9 @@ body.bp6-dark { background: var(--page); color: var(--ink-1); }
   .home { padding: 16px; }
   .home-grid { grid-template-columns: 1fr; }
   .legend-note { display: none; }
+  .topbar.bp6-navbar { height: auto; display: flex; flex-wrap: wrap; padding: 0 8px; }
+  .topbar .bp6-navbar-group { height: auto; min-height: 50px; flex-wrap: wrap; float: none; }
+  .brand small, .synthetic-tag { display: none; }
+  .home-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .timeline-readout { width: auto; }
 }
