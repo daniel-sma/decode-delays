@@ -80,11 +80,11 @@ export function FlightPanel({ day, index, chain, hovered, onSelect, onClose }: {
           <Fact label="Arrival delay" value={cancelled ? '—' : ownMin ? dur(ownMin) : 'On time'} late={ownMin > 0} />
           <Fact label="Delay cost" value={ownMin ? money(ownMin * COST_PER_MIN, true) : '—'} />
           <Fact label="Root cause" value={causes[0] ? <><Icon icon={CAT_META[CATS[causes[0].cat]].icon} size={14} />{CAT_META[CATS[causes[0].cat]].short}</> : '—'} />
-          <Fact label="Delay started at" value={causes[0] ? day.airports[causes[0].ap]?.code ?? '—' : '—'} />
+          <Fact label="Delay started at" value={causes[0] ? day.airports[causes[0].ap]?.code ?? '' : '—'} />
         </div>
       </div>
 
-      <SideSection title="Root cause" right={total ? dur(total) : undefined}>
+      <SideSection title="Root cause">
         {causes.length === 0 ? (
           <div className="row info-row">
             <Icon icon="info-sign" size={14} />
@@ -102,8 +102,8 @@ export function FlightPanel({ day, index, chain, hovered, onSelect, onClose }: {
                   <button className="row" onClick={() => c.root >= 0 && onSelect(c.root)} disabled={c.root < 0 || c.root === index}>
                     <Icon icon={meta.icon} size={14} />
                     <span className="row-main">
-                      <b>{meta.short} · {day.airports[c.ap]?.code ?? '?'}</b>
-                      <span>{c.hops === 0 ? 'On this flight' : `${c.hops} flight${c.hops > 1 ? 's' : ''} back · ${flightLabel(day, c.root)}`}</span>
+                      <b>{[meta.short, day.airports[c.ap]?.code].filter(Boolean).join(' · ')}</b>
+                      <span>{c.hops === 0 ? 'On this flight' : [`${c.hops} flight${c.hops > 1 ? 's' : ''} back`, c.root >= 0 ? flightLabel(day, c.root) : ''].filter(Boolean).join(' · ')}</span>
                     </span>
                     <span className="row-num">{dur(c.min)}</span>
                     <Tag minimal className="row-tag">{pct(c.min, total)}</Tag>
@@ -121,11 +121,11 @@ export function FlightPanel({ day, index, chain, hovered, onSelect, onClose }: {
         )}
       </SideSection>
 
-      <SideSection title={`Aircraft ${f.tail[index] || ''}`} right={`${chain.length} flights`}>
+      <SideSection title={`Aircraft ${f.tail[index] || ''}`}>
         <RippleChain day={day} chain={chain} selected={index} hovered={hovered} onSelect={onSelect} />
       </SideSection>
 
-      <SideSection title="Cost" right={ownMin + knockOn.min ? money((ownMin + knockOn.min) * COST_PER_MIN, true) : undefined}>
+      <SideSection title="Cost">
         {ownMin === 0 && knockOn.min === 0 ? (
           <div className="row info-row">
             <Icon icon="info-sign" size={14} />
@@ -160,6 +160,13 @@ export function FlightPanel({ day, index, chain, hovered, onSelect, onClose }: {
                 </div>
               </li>
             )}
+            <li>
+              <div className="row static total">
+                <Icon icon="calculator" size={14} />
+                <span className="row-main"><b>Total cost</b></span>
+                <span className="row-num">{money((ownMin + knockOn.min) * COST_PER_MIN, true)}</span>
+              </div>
+            </li>
           </ul>
         )}
       </SideSection>

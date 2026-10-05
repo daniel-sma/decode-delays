@@ -105,12 +105,16 @@ export async function loadDay(date: string): Promise<Day> {
 
 export const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
 
+/** "WN 4067", or '' when the flight isn't in the data (e.g. a root cause on a day that wasn't exported). */
 export function flightLabel(day: Day, i: number) {
-  return `${day.flights.carrier[i]} ${day.flights.fn[i]}`
+  const f = day.flights
+  return f.carrier[i] != null && f.fn[i] != null ? `${f.carrier[i]} ${f.fn[i]}` : ''
 }
 
+/** "VPS → BWI", or '' when unknown. */
 export function route(day: Day, i: number) {
-  return `${day.airports[day.flights.o[i]].code} → ${day.airports[day.flights.d[i]].code}`
+  const o = day.airports[day.flights.o[i]]?.code, d = day.airports[day.flights.d[i]]?.code
+  return o && d ? `${o} → ${d}` : ''
 }
 
 /** All flights flown by the same tail, in order. */

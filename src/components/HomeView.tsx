@@ -142,7 +142,8 @@ export default function HomeView({ day, onOpenFlight }: Props) {
         const r = roots[i]
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
         const c = CAT_META[CATS[r.cat]]
-        return <CatLabel icon={c.icon}>{c.short} at <strong>{day.airports[r.airport]?.code ?? '?'}</strong> <span className={Classes.TEXT_MUTED}>{pct(r.share, 1)}</span></CatLabel>
+        const ap = day.airports[r.airport]?.code
+        return <CatLabel icon={c.icon}>{c.short}{ap && <> at <strong>{ap}</strong></>} <span className={Classes.TEXT_MUTED}>{pct(r.share, 1)}</span></CatLabel>
       },
       menu: () => (
         <RootCauseMenu<number | null, number | null>

@@ -445,3 +445,7 @@ span.ws-tab { padding: 0; }
 /* ---------- keyboard: the row highlighted with up / down on the delays table */
 .bp6-dark .bp6-table-cell.row-cursor { background-color: var(--selection); }
 .bp6-dark .bp6-table-cell-col-0.row-cursor { box-shadow: inset 2px 0 0 var(--accent), inset 0 -1px 0 var(--line); }
+
+/* ---------- cost: the total sits in its own row under the breakdown */
+.row.static.total { margin-top: var(--s-1); background: var(--bg-head); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.row.static.total .row-main b, .row.static.total .row-num { font-weight: 600; color: var(--ink-1); }
