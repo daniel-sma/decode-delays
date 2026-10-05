@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
-import { CAT_META, COST_NOTE, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
+import { CAT_META, COST_PER_MIN, REPORTED_META, clock, fmt, money, pct, prettyDate } from '../theme'
 import { RippleChain, Stat, statusTag } from './Panels'
 import CatLabel from './CatLabel'
 import { RootCauseMenu, SearchFilterMenu, SimpleFilterMenu, type Choice } from './HeaderMenus'
@@ -171,22 +171,19 @@ export default function HomeView({ day, onOpenFlight }: Props) {
   return (
     <div className="home">
       <div className="home-main">
-        <div className="kpi-block">
-          <div className="kpis">
+        <div className="kpis">
             <Stat label="Est. delay cost" value={cost(repTotal)} />
             <Stat label="Hidden as “late aircraft”" value={cost(t.reported.late)} />
             <Stat label="Traced to weather" value={cost(t.decoded.weather)} />
             <Stat label="Airline-controllable" value={cost(t.decoded.airline)} />
             <Stat label="Flights delayed 15+ min" value={fmt(delayed)} />
             <Stat label="Cancelled" value={fmt(cancelled)} />
-          </div>
-          <p className="kpi-note">{COST_NOTE}</p>
         </div>
 
         <Section
           className="home-table-section"
           title={singleTail ? `Tail ${singleTail}` : q.trim() ? `Flights matching “${q.trim()}”` : 'Biggest delays'}
-          subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : 'Open a flight to see its plane’s day on the map. Filter from the column headers.'}
+          subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : `${prettyDate(day.date)} · open a flight to see its aircraft’s day on the map`}
           icon={singleTail ? 'airplane' : 'th-list'}
           rightElement={
             <span className="table-meta">

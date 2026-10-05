@@ -164,7 +164,6 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
             )}
           </ul>
         )}
-        <p className="side-note">At $98.41 per delay minute (Airlines for America, 2025).</p>
       </SideSection>
 
       <SideSection title="Event log">

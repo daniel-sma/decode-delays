@@ -1,20 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Alignment, Callout, Classes, Code, H4, Icon, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
+  Alignment, Callout, Classes, Code, H4, Icon, Navbar, NavbarGroup,
   NonIdealState, Spinner, Tag,
 } from '@blueprintjs/core'
 import { flightLabel, loadDay, loadSummary, route, type Day, type Summary } from './data'
 import { prettyDate } from './theme'
 import HomeView from './components/HomeView'
 import FlightView from './components/FlightView'
-import DayPicker from './components/DayPicker'
 
 /** One open aircraft. `opened` is the flight it was opened on; `selected` follows the sidebar. */
 interface FlightTab { id: number; tail: string; opened: number; selected: number }
 
 export default function App() {
   const [summary, setSummary] = useState<Summary | null | undefined>(undefined)
-  const [date, setDate] = useState<string | null>(null)
+  const [date, setDate] = useState<string | null>(null) // the most disrupted day; there's no day picker
   const [day, setDay] = useState<Day | null>(null)
   const [tabs, setTabs] = useState<FlightTab[]>([])
   const [active, setActive] = useState<number | null>(null) // tab id, or null for the delays table
@@ -63,13 +62,16 @@ export default function App() {
 
   return (
     <div className="app">
+      <header className="brandbar">
+        <div className="brand">
+          <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={30} height={30} />
+          <span>DeTrace</span>
+        </div>
+        {summary.synthetic && <Tag intent="warning" icon="warning-sign" className="synthetic-tag">Synthetic sample data</Tag>}
+        <span className="brand-stripe" aria-hidden />
+      </header>
       <Navbar className="topbar">
         <NavbarGroup align={Alignment.START} className="topbar-left">
-          <NavbarHeading className="brand">
-            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={22} height={22} />
-            <span>DeTrace</span>
-          </NavbarHeading>
-          <NavbarDivider />
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={active == null} className={`ws-tab${active == null ? ' on' : ''}`} onClick={() => setActive(null)}>
               <Icon icon="th-list" size={14} /> Biggest delays
@@ -85,11 +87,6 @@ export default function App() {
               </span>
             ))}
           </div>
-        </NavbarGroup>
-        <NavbarGroup align={Alignment.END}>
-          {summary.synthetic && <Tag intent="warning" icon="warning-sign" className="synthetic-tag">Synthetic sample data</Tag>}
-          <span className="concept-note">Concept · not affiliated with Southwest Airlines</span>
-          {date && <DayPicker summary={summary} value={date} onChange={setDate} />}
         </NavbarGroup>
       </Navbar>
       {summary.synthetic && (
