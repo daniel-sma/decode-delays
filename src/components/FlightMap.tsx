@@ -18,7 +18,7 @@ const states = feature(topo, topo.objects.states)
 
 // Dark vector basemap: near-black water (the map frame behind the canvas), dark land, faint borders and
 // water-body labels, so the routes are the brightest thing on the map.
-const LAND: RGBA = [37, 33, 30, 255] // #25211E
+const LAND: RGBA = [21, 21, 21, 255] // #151515
 const COAST: RGBA = [255, 255, 255, 26]
 const BORDER: RGBA = [255, 255, 255, 46]
 const STATE: RGBA = [255, 255, 255, 22]
@@ -31,7 +31,51 @@ const WATER_LABELS: { text: string; at: [number, number] }[] = [
   { text: 'Hudson\nBay', at: [-85.5, 59.5] },
 ]
 
-interface World { land: GeoJSON.FeatureCollection; borders: GeoJSON.MultiLineString; coast: GeoJSON.MultiLineString }
+// Place names: countries, and US states from STATE_ZOOM in (when the US name gives way to them). A name
+// shows only if its place is about as wide as the text on screen and it doesn't overlap a bigger place's
+// name or an airport (see `places` below).
+const COUNTRY_LABEL: RGBA = [255, 255, 255, 110]
+const STATE_LABEL: RGBA = [255, 255, 255, 80]
+const STATE_ZOOM = 3.2
+const US = 'United States of America'
+const SHORT_NAMES: Record<string, string> = { [US]: 'United States', 'Dominican Rep.': 'Dominican Rep.', 'Bosnia and Herz.': 'Bosnia', 'Central African Rep.': 'C. African Rep.' }
+// Where the largest polygon's centre falls badly (water, or the wrong side of a bay).
+const LABEL_AT: Record<string, [number, number]> = {
+  Canada: [-104, 57], [US]: [-98.5, 39.5], Florida: [-81.6, 28.2], Michigan: [-84.7, 43.4], Louisiana: [-92.4, 31.1],
+  Maryland: [-76.9, 39.4], Virginia: [-78.6, 37.6], Massachusetts: [-71.9, 42.35], 'New York': [-75.2, 42.9], Kentucky: [-85.3, 37.5],
+  Norway: [9, 61.5], Chile: [-71, -30], Russia: [95, 62], Indonesia: [114, -1], Japan: [138.5, 36.5], Malaysia: [102, 4.2],
+}
+interface PlaceLabel { name: string; at: [number, number]; area: number; country: boolean; box: [number, number, number, number] }
+
+/** Planar area and centroid of a ring in lon/lat (shoelace); good enough to place a label. */
+function ringStats(ring: number[][]) {
+  let a = 0, x = 0, y = 0
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const f = ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1]
+    a += f; x += (ring[j][0] + ring[i][0]) * f; y += (ring[j][1] + ring[i][1]) * f
+  }
+  const lons = ring.map((c) => c[0]), lats = ring.map((c) => c[1])
+  const box: [number, number, number, number] = [Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)]
+  return { area: a ? Math.abs(a / 2) : 0, at: (a ? [x / (3 * a), y / (3 * a)] : ring[0]) as [number, number], box }
+}
+
+/** One label per feature, at the centre of its largest polygon unless LABEL_AT says otherwise. */
+function placeLabels(fc: GeoJSON.FeatureCollection, country: boolean): PlaceLabel[] {
+  const out: PlaceLabel[] = []
+  for (const f of fc.features) {
+    const name = f.properties?.name as string | undefined
+    const g = f.geometry
+    if (!name || !g || (g.type !== 'Polygon' && g.type !== 'MultiPolygon')) continue
+    const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates
+    let best = ringStats(polys[0][0]), total = 0
+    for (const p of polys) { const r = ringStats(p[0]); total += r.area; if (r.area > best.area) best = r }
+    out.push({ name: SHORT_NAMES[name] ?? name, at: LABEL_AT[name] ?? best.at, area: total, country, box: best.box })
+  }
+  return out
+}
+const stateLabels = placeLabels(states as GeoJSON.FeatureCollection, false)
+
+interface World { land: GeoJSON.FeatureCollection; borders: GeoJSON.MultiLineString; coast: GeoJSON.MultiLineString; labels: PlaceLabel[] }
 let worldCache: Promise<World> | null = null
 function loadWorld(): Promise<World> {
   worldCache ??= fetch(worldUrl).then((r) => r.json()).then((t: Topology) => {
@@ -40,6 +84,7 @@ function loadWorld(): Promise<World> {
       land: feature(t, countries) as GeoJSON.FeatureCollection,
       borders: mesh(t, countries, (a, b) => a !== b),
       coast: mesh(t, countries, (a, b) => a === b),
+      labels: placeLabels(feature(t, countries) as GeoJSON.FeatureCollection, true),
     }
   })
   return worldCache
@@ -59,6 +104,10 @@ const WHITE: RGBA = [241, 243, 245, 255] // --map-selected
 // Map marker: the plane artwork faces east (nose right), so it turns by 90° less than the bearing.
 const PLANE = `${import.meta.env.BASE_URL}brand/plane.png`
 const PLANE_HEADING = 90
+
+const FONT = getComputedStyle(document.body).fontFamily
+const COUNTRY_SIZE = 12
+const STATE_SIZE = 11
 
 interface Props {
   day: Day
@@ -145,6 +194,61 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const sel = legs.find((l) => l.i === selected)
   const planeOnSel = plane?.leg?.i === selected
 
+  const s = { o: f.o[selected], d: f.d[selected] }
+  const labels = useMemo(() => {
+    if (!viewport) return []
+    // The selected leg's two airports first, then the rest; each takes the first spot that doesn't collide.
+    const order = [s.o, s.d, ...airports.filter((a) => a !== s.o && a !== s.d)]
+    const placed: { x: number; y: number; w: number; h: number }[] = []
+    const hit = (b: { x: number; y: number; w: number; h: number }) =>
+      placed.some((o) => b.x < o.x + o.w + 4 && b.x + b.w + 4 > o.x && b.y < o.y + o.h + 4 && b.y + b.h + 4 > o.y)
+    return order.map((ap) => {
+      const a = day.airports[ap]
+      // Project onto whichever world copy is nearest the view centre (the map repeats horizontally).
+      const lon = a.lon + 360 * Math.round((view.longitude - a.lon) / 360)
+      const [x, y] = viewport.project([lon, a.lat])
+      const detail = ap === s.o || ap === s.d
+      const w = detail ? 150 : 44, h = detail ? 40 : 18, g = 8
+      const spots = [
+        { x: x - w / 2, y: y - h - g }, { x: x - w / 2, y: y + g }, { x: x + g, y: y - h / 2 }, { x: x - w - g, y: y - h / 2 },
+        { x: x + g, y: y - h - g }, { x: x - w - g, y: y + g }, { x: x + g, y: y + g }, { x: x - w - g, y: y - h - g },
+      ]
+      const spot = spots.find((p) => !hit({ ...p, w, h })) ?? spots[0]
+      placed.push({ ...spot, w, h })
+      return { ap, detail, box: { ...spot, w, h } }
+    })
+  }, [viewport, airports, day, s.o, s.d, view.longitude])
+
+  // Place names that fit: biggest places first; each needs room on screen and must not overlap a name already
+  // placed or an airport dot and its code.
+  const places = useMemo(() => {
+    if (!viewport || !world) return []
+    const showStates = view.zoom >= STATE_ZOOM
+    const near = (lon: number) => lon + 360 * Math.round((view.longitude - lon) / 360)
+    // Airport dots and their code / detail cards are taken first.
+    const taken = labels.flatMap(({ ap, box }) => {
+      const [x, y] = viewport.project([near(day.airports[ap].lon), day.airports[ap].lat])
+      return [box, { x: x - 8, y: y - 8, w: 16, h: 16 }]
+    })
+    const cands = [
+      ...world.labels.filter((l) => !(showStates && l.name === 'United States')),
+      ...(showStates ? stateLabels : []),
+    ].sort((a, b) => Number(b.country) - Number(a.country) || b.area - a.area)
+    const out: PlaceLabel[] = []
+    for (const l of cands) {
+      const fs = l.country ? COUNTRY_SIZE : STATE_SIZE
+      const w = l.name.length * fs * (l.country ? 0.68 : 0.56), h = fs + 4
+      const [x0] = viewport.project([near(l.box[0]), l.box[1]]), [x1] = viewport.project([near(l.box[2]), l.box[3]])
+      if (Math.abs(x1 - x0) < w * 0.75) continue // the place is too small for its name at this zoom
+      const [x, y] = viewport.project([near(l.at[0]), l.at[1]])
+      if (x < -w || x > size.width + w || y < -h || y > size.height + h) continue
+      const b = { x: x - w / 2 - 4, y: y - h / 2 - 2, w: w + 8, h: h + 4 }
+      if (taken.some((o) => b.x < o.x + o.w && b.x + b.w > o.x && b.y < o.y + o.h && b.y + b.h > o.y)) continue
+      taken.push(b)
+      out.push(l)
+    }
+    return out
+  }, [viewport, world, view.zoom, view.longitude, labels, day])
   const layers = [
     new GeoJsonLayer({ id: 'land', data: world?.land, filled: true, stroked: false, getFillColor: LAND }),
     new GeoJsonLayer({ id: 'coast', data: world?.coast, stroked: true, getLineColor: COAST, lineWidthUnits: 'pixels', getLineWidth: 1 }),
@@ -152,8 +256,18 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     new GeoJsonLayer({ id: 'borders', data: world?.borders, stroked: true, getLineColor: BORDER, lineWidthUnits: 'pixels', getLineWidth: 1 }),
     new TextLayer({
       id: 'water-labels', data: WATER_LABELS, getPosition: (d) => d.at, getText: (d) => d.text,
-      getColor: WATER_LABEL, getSize: 15, lineHeight: 1.15, fontFamily: getComputedStyle(document.body).fontFamily, fontWeight: 400,
+      getColor: WATER_LABEL, getSize: 15, lineHeight: 1.15, fontFamily: FONT, fontWeight: 400,
       characterSet: 'auto',
+    }),
+    new TextLayer<PlaceLabel>({
+      id: 'country-labels', data: places.filter((l) => l.country),
+      getPosition: (d) => d.at, getText: (d) => d.name.toUpperCase(), getColor: COUNTRY_LABEL, getSize: COUNTRY_SIZE,
+      fontFamily: FONT, fontWeight: 600, characterSet: 'auto',
+    }),
+    new TextLayer<PlaceLabel>({
+      id: 'state-labels', data: places.filter((l) => !l.country),
+      getPosition: (d) => d.at, getText: (d) => d.name, getColor: STATE_LABEL, getSize: STATE_SIZE,
+      fontFamily: FONT, fontWeight: 400, characterSet: 'auto',
     }),
     // Legs still to fly are dashed, like a planned route.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
@@ -190,30 +304,6 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     }),
   ]
 
-  const s = { o: f.o[selected], d: f.d[selected] }
-  const labels = useMemo(() => {
-    if (!viewport) return []
-    // The selected leg's two airports first, then the rest; each takes the first spot that doesn't collide.
-    const order = [s.o, s.d, ...airports.filter((a) => a !== s.o && a !== s.d)]
-    const placed: { x: number; y: number; w: number; h: number }[] = []
-    const hit = (b: { x: number; y: number; w: number; h: number }) =>
-      placed.some((o) => b.x < o.x + o.w + 4 && b.x + b.w + 4 > o.x && b.y < o.y + o.h + 4 && b.y + b.h + 4 > o.y)
-    return order.map((ap) => {
-      const a = day.airports[ap]
-      // Project onto whichever world copy is nearest the view centre (the map repeats horizontally).
-      const lon = a.lon + 360 * Math.round((view.longitude - a.lon) / 360)
-      const [x, y] = viewport.project([lon, a.lat])
-      const detail = ap === s.o || ap === s.d
-      const w = detail ? 150 : 44, h = detail ? 40 : 18, g = 8
-      const spots = [
-        { x: x - w / 2, y: y - h - g }, { x: x - w / 2, y: y + g }, { x: x + g, y: y - h / 2 }, { x: x - w - g, y: y - h / 2 },
-        { x: x + g, y: y - h - g }, { x: x - w - g, y: y + g }, { x: x + g, y: y + g }, { x: x - w - g, y: y - h - g },
-      ]
-      const spot = spots.find((p) => !hit({ ...p, w, h })) ?? spots[0]
-      placed.push({ ...spot, w, h })
-      return { ap, detail, box: { ...spot, w, h } }
-    })
-  }, [viewport, airports, day, s.o, s.d, view.longitude])
 
   const dep = actualDep(day, selected)
   const arr = actualArr(day, selected)
