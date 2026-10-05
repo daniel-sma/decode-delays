@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
+import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
 import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root } from '../data'
 import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
 import { RippleChain, Stat } from './Panels'
+import CatLabel from './CatLabel'
 
 interface Props {
   day: Day
@@ -11,6 +12,9 @@ interface Props {
 }
 
 interface Filter { cat: number | null; airport: number | null }
+
+// Width reserved for the table's vertical scrollbar so columns never overflow sideways.
+const SCROLLBAR = 16
 
 export default function HomeView({ day, onOpenFlight }: Props) {
   const [q, setQ] = useState('')
@@ -50,7 +54,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
         const r = topReported(day, i)
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
         const m = REPORTED_META[r[0]]
-        return <span className="dot-label"><i className={m.hatch ? 'hatch' : ''} style={{ background: m.hatch ? undefined : m.color, ['--seg' as string]: m.color }} />{m.label} <span className={Classes.TEXT_MUTED}>{pct(r[1], 1)}</span></span>
+        return <CatLabel icon={m.icon}>{m.label} <span className={Classes.TEXT_MUTED}>{pct(r[1], 1)}</span></CatLabel>
       },
     },
     {
@@ -59,7 +63,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
         const r = roots[i]
         if (!r) return <span className={Classes.TEXT_MUTED}>—</span>
         const c = CAT_META[CATS[r.cat]]
-        return <span className="dot-label"><i style={{ background: c.color }} />{c.short} at <strong>{day.airports[r.airport]?.code ?? '?'}</strong> <span className={Classes.TEXT_MUTED}>{pct(r.share, 1)}</span></span>
+        return <CatLabel icon={c.icon}>{c.short} at <strong>{day.airports[r.airport]?.code ?? '?'}</strong> <span className={Classes.TEXT_MUTED}>{pct(r.share, 1)}</span></CatLabel>
       },
     },
     {
@@ -83,7 +87,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
     ro.observe(el)
     return () => ro.disconnect()
   }, [])
-  const extra = Math.max(0, cardWidth - sum(columns.map((c) => c.width)) - 2)
+  const extra = Math.max(0, cardWidth - sum(columns.map((c) => c.width)) - SCROLLBAR)
   const widths = columns.map((c) => c.width + (c.name === 'BTS reported' || c.name === 'Decoded root cause' ? extra / 2 : 0))
 
   const onSelection = (regions: Region[]) => {
@@ -93,7 +97,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
   }
 
   const filterTags = [
-    filter.cat != null && <Tag key="c" size="large" onRemove={() => setFilter({ ...filter, cat: null })} icon={<i className="tag-dot" style={{ background: CAT_META[CATS[filter.cat]].color }} />}>Root cause: {CAT_META[CATS[filter.cat]].short}</Tag>,
+    filter.cat != null && <Tag key="c" size="large" onRemove={() => setFilter({ ...filter, cat: null })} icon={CAT_META[CATS[filter.cat]].icon}>Root cause: {CAT_META[CATS[filter.cat]].short}</Tag>,
     filter.airport != null && <Tag key="a" size="large" onRemove={() => setFilter({ ...filter, airport: null })} icon="map-marker">Started at {day.airports[filter.airport].code}</Tag>,
   ].filter(Boolean)
 
@@ -102,11 +106,11 @@ export default function HomeView({ day, onOpenFlight }: Props) {
       <div className="home-main">
         <div className="kpis">
           <Stat label="Flights scheduled" value={fmt(t.flights)} />
-          <Stat label="Arrived 15+ min late" value={fmt(delayed)} sub={pct(delayed, t.flights)} />
-          <Stat label="Cancelled" value={fmt(cancelled)} sub={pct(cancelled, t.flights)} />
-          <Stat label="Delay minutes" value={fmt(repTotal)} sub={`${dur(repTotal / Math.max(1, delayed))} avg per delayed flight`} />
-          <Stat label="Filed as late aircraft" value={pct(t.reported.late, repTotal)} sub="no root cause given" />
-          <Stat label="Traced to weather" value={pct(t.decoded.weather, repTotal)} sub={`vs ${pct(t.reported.weather, repTotal)} reported`} color={CAT_META.weather.color} />
+          <Stat label="Arrived 15+ min late" value={fmt(delayed)} />
+          <Stat label="Cancelled" value={fmt(cancelled)} />
+          <Stat label="Delay minutes" value={fmt(repTotal)} />
+          <Stat label="Filed as late aircraft" value={pct(t.reported.late, repTotal)} />
+          <Stat label="Traced to weather" value={pct(t.decoded.weather, repTotal)} />
         </div>
 
         <RootCauseCheck day={day} roots={roots} filter={filter} onFilter={setFilter} />
@@ -116,7 +120,7 @@ export default function HomeView({ day, onOpenFlight }: Props) {
           title={singleTail ? `Tail ${singleTail}` : q.trim() ? `Flights matching “${q.trim()}”` : 'Biggest delays'}
           subtitle={singleTail ? 'Every flight this aircraft flew today, in order. Open one to trace it.' : 'Open a flight to see its plane’s day on the map.'}
           icon={singleTail ? 'airplane' : 'th-list'}
-          rightElement={<Tag minimal round>{fmt(rows.length)}{rows.length === 300 ? '+' : ''} flights</Tag>}
+          rightElement={<Tag minimal>{fmt(rows.length)}{rows.length === 300 ? '+' : ''} flights</Tag>}
         >
           <SectionCard padded>
             <InputGroup
@@ -194,10 +198,10 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
             return (
               <li key={g.c} className={filter.cat === g.c ? 'on' : ''}>
                 <button className="check-main" aria-pressed={catOn} onClick={() => onFilter(catOn ? { cat: null, airport: null } : { cat: g.c, airport: null })}>
-                  <strong><i className="tag-dot" style={{ background: meta.color }} />{meta.label}</strong>
+                  <strong><Icon icon={meta.icon} size={16} />{meta.label}</strong>
                   <span className="check-tags">
-                    <Tag minimal round>{fmt(g.flights)} flights</Tag>
-                    <Tag minimal round>{dur(g.minutes)}</Tag>
+                    <Tag minimal>{fmt(g.flights)} flights</Tag>
+                    <Tag minimal>{dur(g.minutes)}</Tag>
                   </span>
                 </button>
                 <div className="check-detail">
@@ -207,7 +211,6 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
                       <Tag
                         key={ap}
                         interactive
-                        round
                         minimal={!on}
                         intent={on ? 'primary' : 'none'}
                         className="ap-chip"

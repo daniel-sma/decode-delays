@@ -78,9 +78,10 @@ Outputs go to `public/data/`: `summary.json` (month strip and trace stats) and `
 The UI is built on **[Blueprint](https://blueprintjs.com/docs/)** (`@blueprintjs/core`, `icons`, `table`, v6),
 Palantir's open-source React toolkit for data-dense interfaces, in its dark theme.
 
-The look is a glass treatment of Blueprint's dark theme: translucent, blurred panels over a navy gradient,
-on one spacing scale (4/8/12/16/24). The flight page's scrubber borrows from Palantir's ops-console video
-timelines.
+The look is Blueprint's default dark theme with square corners, on one spacing scale (4/8/12/16/20).
+Causes are told apart by Blueprint icons (weather `cloud`, airspace `antenna`, airline `wrench`, security
+`shield`, untraced `help`, late aircraft `history`), not colour. The flight page's scrubber borrows from
+Palantir's ops-console video timelines.
 
 | File | What it does |
 |---|---|
@@ -92,12 +93,9 @@ timelines.
 | `src/components/Scrubber.tsx` | Playback: clock, transport controls (start, slower, −15m, previous event, play, next event, +15m, faster), hour ruler, leg spans, and a histogram of how late the plane is running, coloured by root cause |
 | `src/components/Panels.tsx` | Flight sidebar: times, root-cause summary with weather evidence, reported vs decoded, the plane's day, and a collapsed breakdown |
 | `src/components/CauseCompare.tsx` | Reported vs decoded 100% bars |
-| `src/theme.ts`, `src/styles.css` | Category colours and labels, formatting, the glass theme |
+| `src/theme.ts`, `src/styles.css` | Category icons and labels, formatting, layout |
 
-**Colour (Blueprint palette):** weather blue-4 `#4c90f0`, airspace turquoise-3 `#00a396`, airline
-vermilion-3 `#d33d17`, untraced/late-aircraft gray-3 `#8f99a8` (hatched). The three hues pass an all-pairs
-colour-vision-deficiency check on dark-gray-1 `#1c2127`. Vermilion rather than orange keeps "airline"
-from reading as Blueprint's warning intent. Security (indigo-4 `#9881f3`) only appears in bars.
+**Colour:** one Blueprint blue marks lateness (map legs, the scrubber histogram, the plane's-day bars); grey means on time or inherited. Category identity is always an icon plus a label.
 
 ## Built with AI
 

@@ -1,59 +1,46 @@
+import type { IconName } from '@blueprintjs/icons'
 import type { Cat, Reported } from './data'
 
-// Blueprint palette steps (blue4, turquoise3, vermilion3), validated all-pairs for colour-vision
-// deficiency on Blueprint dark-gray-1. Vermilion, not orange, so airline never reads as a warning intent.
-export const COLOR = {
-  blue: '#4c90f0', // --bp-palette-blue-4
-  aqua: '#00a396', // --bp-palette-turquoise-3
-  orange: '#d33d17', // --bp-palette-vermilion-3
-  violet: '#9881f3', // --bp-palette-indigo-4
-  gray: '#8f99a8', // --bp-palette-gray-3
-}
-
-export const CAT_META: Record<Cat, { label: string; short: string; color: string; blurb: string }> = {
+// Categories are told apart by Blueprint icons and labels, not colour.
+export const CAT_META: Record<Cat, { label: string; short: string; icon: IconName; blurb: string }> = {
   weather: {
     label: 'Weather',
     short: 'Weather',
-    color: COLOR.blue,
+    icon: 'cloud',
     blurb: 'Extreme weather, plus air-traffic delays at an airport with thunderstorms, low ceilings or strong gusts at the time.',
   },
   airspace: {
     label: 'Airspace & volume',
     short: 'Airspace',
-    color: COLOR.aqua,
+    icon: 'antenna',
     blurb: 'Air-traffic control delays with no adverse weather on record: congestion, runway or equipment limits, staffing.',
   },
   airline: {
     label: 'Airline',
     short: 'Airline',
-    color: COLOR.orange,
+    icon: 'wrench',
     blurb: 'Within the airline’s control: maintenance, crew, cleaning, baggage, fueling, boarding.',
   },
   security: {
     label: 'Security',
     short: 'Security',
-    color: COLOR.violet,
+    icon: 'shield',
     blurb: 'Terminal evacuations, screening breaches, long security lines.',
   },
   untraced: {
     label: 'Untraced late aircraft',
     short: 'Untraced',
-    color: COLOR.gray,
+    icon: 'help',
     blurb: 'Inherited delay whose upstream flight has no cause breakdown (e.g. it arrived <15 min late, or the tail chain breaks).',
   },
 }
 
-export const REPORTED_META: Record<Reported, { label: string; color: string; hatch?: boolean }> = {
-  carrier: { label: 'Carrier', color: COLOR.orange },
-  weather: { label: 'Weather', color: COLOR.blue },
-  nas: { label: 'NAS', color: COLOR.aqua },
-  security: { label: 'Security', color: COLOR.violet },
-  late: { label: 'Late aircraft', color: COLOR.gray, hatch: true },
-}
-
-export function hexToRgb(hex: string, alpha = 255): [number, number, number, number] {
-  const n = parseInt(hex.slice(1), 16)
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255, alpha]
+export const REPORTED_META: Record<Reported, { label: string; icon: IconName }> = {
+  carrier: { label: 'Carrier', icon: 'wrench' },
+  weather: { label: 'Weather', icon: 'cloud' },
+  nas: { label: 'NAS', icon: 'antenna' },
+  security: { label: 'Security', icon: 'shield' },
+  late: { label: 'Late aircraft', icon: 'history' },
 }
 
 /** Minutes relative to midnight ET of the selected day → "3:10 pm". */

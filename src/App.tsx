@@ -61,15 +61,9 @@ export default function App() {
 
   return (
     <div className="app">
-      <Navbar className="topbar glass">
+      <Navbar className="topbar">
         <NavbarGroup align={Alignment.START}>
-          <NavbarHeading className="brand">
-            <span className="logo" aria-hidden />
-            <span>
-              <strong>Decode Delays</strong>
-              <small>Root causes of US flight delays</small>
-            </span>
-          </NavbarHeading>
+          <NavbarHeading>Decode Delays</NavbarHeading>
           <NavbarDivider />
           <Breadcrumbs items={crumbs} />
         </NavbarGroup>

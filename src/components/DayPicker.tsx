@@ -60,8 +60,8 @@ export default function DayPicker({ summary, value, onChange }: { summary: Summa
   )
 
   return (
-    <Popover content={calendar} placement="bottom-end" isOpen={open} onInteraction={(next) => { setOpen(next); if (!next) setNotice(null) }} popoverClassName="glass-popover">
-      <Button icon="calendar" rightIcon="caret-down" text={prettyDate(value) + `, ${y}`} className="date-button" />
+    <Popover content={calendar} placement="bottom-end" isOpen={open} onInteraction={(next) => { setOpen(next); if (!next) setNotice(null) }}>
+      <Button icon="calendar" rightIcon="caret-down" text={prettyDate(value) + `, ${y}`} className="date-button" variant="outlined" />
     </Popover>
   )
 }

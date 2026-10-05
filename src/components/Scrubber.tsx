@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Button, Tag, Tooltip } from '@blueprintjs/core'
-import { CATS, decodedByCat, route, type Day } from '../data'
-import { CAT_META, dur } from '../theme'
+import { route, type Day } from '../data'
+import { dur } from '../theme'
 
 export const SPEEDS = [1, 2, 4, 8, 16]
 
@@ -80,18 +80,10 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
   const BUCKET = nice(span / 160, [5, 10, 15, 20, 30])
 
   const bars = useMemo(() => {
-    const out: { t: number; late: number; cat: number }[] = []
-    for (let t = win.t0; t < win.t1; t += BUCKET) {
-      const { late, leg } = lateness(day, legs, t + BUCKET / 2)
-      let cat = -1
-      if (leg != null && late >= 1) {
-        const by = decodedByCat(f.decoded[leg])
-        cat = by.some((v) => v > 0) ? by.indexOf(Math.max(...by)) : -1
-      }
-      out.push({ t, late, cat })
-    }
+    const out: { t: number; late: number }[] = []
+    for (let t = win.t0; t < win.t1; t += BUCKET) out.push({ t, late: lateness(day, legs, t + BUCKET / 2).late })
     return out
-  }, [day, legs, win, f, BUCKET])
+  }, [day, legs, win, BUCKET])
   const maxLate = Math.max(60, ...bars.map((b) => b.late)) * 1.1
   const yStep = nice(maxLate / 2.6, [15, 30, 60, 120, 240, 360, 720])
 
@@ -113,7 +105,7 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
   const now = lateness(day, legs, time)
 
   return (
-    <div className="scrubber glass">
+    <div className="scrubber">
       <div className="scrub-bar">
         <div className="scrub-clock">
           <span className="scrub-time">{clock24(time)}</span>
@@ -174,7 +166,7 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
               <span
                 key={b.t}
                 className={`bar${b.t + BUCKET <= time ? ' past' : ''}`}
-                style={{ left: pct(b.t), width: `calc(${(BUCKET / span) * 100}% - 1px)`, height: `${(b.late / maxLate) * 100}%`, background: b.cat >= 0 ? CAT_META[CATS[b.cat]].color : '#8f99a8' }}
+                style={{ left: pct(b.t), width: `calc(${(BUCKET / span) * 100}% - 1px)`, height: `${(b.late / maxLate) * 100}%` }}
               />
             ))}
           </div>

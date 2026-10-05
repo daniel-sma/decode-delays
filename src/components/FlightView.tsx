@@ -55,7 +55,7 @@ export default function FlightView({ day, index }: { day: Day; index: number }) 
         </div>
         <Scrubber day={day} chain={chain} win={win} time={time} playing={playing} speed={speed} onTime={setTime} onPlay={setPlaying} onSpeed={setSpeed} />
       </div>
-      <aside className="panel glass">
+      <aside className="panel">
         <FlightPanel day={day} index={selected} chain={chain} onSelect={pick} />
       </aside>
     </main>

@@ -3,6 +3,7 @@ import { AnchorButton, Callout, Card, Classes, H3, HTMLTable, Icon, Section, Sec
 import { CATS, decodedByCat, flightLabel, rootOf, route, sum, type Day } from '../data'
 import { CAT_META, clock, dur, hourLabel, prettyDate } from '../theme'
 import CauseCompare from './CauseCompare'
+import CatLabel from './CatLabel'
 
 const CANCEL = { A: 'Carrier', B: 'Weather', C: 'NAS', D: 'Security' } as Record<string, string>
 
@@ -59,7 +60,7 @@ export function FlightPanel({ day, index, chain, onSelect }: {
           <>
             <b>{dur(inhMin)}</b> was inherited
             {top[1].c[4] > 1 ? <>, mostly from {top[1].c[4]} flights earlier</> : <> from the previous flight</>}:{' '}
-            <span style={{ color: CAT_META[CATS[top[1].c[0]]].color }}>{CAT_META[CATS[top[1].c[0]]].label.toLowerCase()}</span>{' '}
+            <b>{CAT_META[CATS[top[1].c[0]]].label.toLowerCase()}</b>{' '}
             at <b>{day.airports[top[1].c[1]]?.code ?? '?'}</b> around {clock(top[1].c[3])}, on{' '}
             <AnchorButton variant="minimal" size="small" intent="primary" className="inline-btn" onClick={() => onSelect(top[0])}>{flightLabel(day, top[0])}</AnchorButton>.
           </>
@@ -89,7 +90,7 @@ export function FlightPanel({ day, index, chain, onSelect }: {
         <dd>{cancelled ? <Tag minimal intent="danger">Cancelled</Tag> : arr != null && arr >= 15 ? <b className="late">+{dur(arr)}</b> : 'On time'}</dd>
       </dl>
 
-      <Callout className="summary" icon="diagnosis" intent={root ? 'primary' : 'none'} title={root ? `${CAT_META[CATS[root.cat]].label} at ${rootCode}` : 'No root cause recorded'}>
+      <Callout className="summary" icon={root ? CAT_META[CATS[root.cat]].icon : 'help'} intent={root ? 'primary' : 'none'} title={root ? `${CAT_META[CATS[root.cat]].label} at ${rootCode}` : 'No root cause recorded'}>
         <p className="sentence">{sentence}</p>
         {evidence && <p className="evidence"><Icon icon="cloud" size={12} /> {rootCode}: {evidence}</p>}
       </Callout>
@@ -118,7 +119,7 @@ export function FlightPanel({ day, index, chain, onSelect }: {
                   const cat = CAT_META[CATS[c[0]]]
                   return (
                     <tr key={k} onClick={() => c[2] >= 0 && onSelect(c[2])}>
-                      <td><span className="dot-label"><i style={{ background: cat.color }} />{cat.short}</span></td>
+                      <td><CatLabel icon={cat.icon}>{cat.short}</CatLabel></td>
                       <td><strong>{day.airports[c[1]]?.code ?? '?'}</strong></td>
                       <td className="nowrap">{clock(c[3])}</td>
                       <td className="nowrap">{c[4] === 0 ? 'This flight' : <>{c[2] >= 0 ? flightLabel(day, c[2]) : '?'} <span className={Classes.TEXT_MUTED}>({c[4]} back)</span></>}</td>
@@ -169,8 +170,8 @@ export function RippleChain({ day, chain, selected, roots, onSelect }: {
               </span>
               <span className="chain-delay">{cancelled ? <Tag minimal intent="danger">Cancelled</Tag> : arr == null ? '—' : arr >= 15 ? `+${dur(arr)}` : 'On time'}</span>
               <span className="chain-bar">
-                {by.map((v, c) => v > 0 && <span key={`o${c}`} style={{ width: `${(100 * v) / max}%`, background: CAT_META[CATS[c]].color }} />)}
-                {inh.map((v, c) => v > 0 && <span key={`i${c}`} className="hatch" style={{ width: `${(100 * v) / max}%`, ['--seg' as string]: CAT_META[CATS[c]].color }} />)}
+                {sum(inh) > 0 && <span className="inherited" style={{ width: `${(100 * sum(inh)) / max}%` }} title={`${dur(sum(inh))} inherited`} />}
+                {sum(by) > 0 && <span className="own" style={{ width: `${(100 * sum(by)) / max}%` }} title={`${dur(sum(by))} started on this flight`} />}
               </span>
             </button>
           </li>

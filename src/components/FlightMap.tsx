@@ -6,15 +6,14 @@ import { Button, ButtonGroup, Card } from '@blueprintjs/core'
 import { feature } from 'topojson-client'
 import type { Topology } from 'topojson-specification'
 import statesTopo from 'us-atlas/states-10m.json'
-import { CATS, decodedByCat, flightLabel, type Day } from '../data'
-import { CAT_META, clock, dur, hexToRgb } from '../theme'
+import { flightLabel, type Day } from '../data'
+import { clock, dur } from '../theme'
 import { actualArr, actualDep } from './Scrubber'
 
 const topo = statesTopo as unknown as Topology
 const states = feature(topo, topo.objects.states)
-const CAT_RGB = CATS.map((c) => hexToRgb(CAT_META[c].color))
+const LATE: [number, number, number, number] = [76, 144, 240, 255] // Blueprint blue-4
 const ON_TIME: [number, number, number, number] = [143, 153, 168, 255]
-const LEGEND = ['weather', 'airspace', 'airline'] as const
 // A plane pointing north; masked so deck.gl tints it.
 const PLANE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#fff" d="M12 2c.8 0 1.4.9 1.4 2v5.2l7.6 4.6v2l-7.6-2.3v4.6l2.2 1.7V21L12 20l-3.6 1v-1.2l2.2-1.7v-4.6L3 15.8v-2l7.6-4.6V4c0-1.1.6-2 1.4-2z"/></svg>')}`
 
@@ -51,11 +50,9 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
 
   const legs = useMemo<Leg[]>(() => chain.map((i) => {
     const o = day.airports[f.o[i]], d = day.airports[f.d[i]]
-    const by = decodedByCat(f.decoded[i])
-    const top = by.indexOf(Math.max(...by))
-    const late = (f.arrDelay[i] ?? 0) >= 15 && by[top] > 0
+    const late = (f.arrDelay[i] ?? 0) >= 15
     return {
-      i, from: [o.lon, o.lat], to: [d.lon, d.lat], color: late ? CAT_RGB[top] : ON_TIME,
+      i, from: [o.lon, o.lat], to: [d.lon, d.lat], color: late ? LATE : ON_TIME,
       cancelled: f.status[i].startsWith('C'), dep: actualDep(day, i), arr: actualArr(day, i),
     }
   }), [day, chain, f])
@@ -107,7 +104,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const layers = [
     new GeoJsonLayer({
       id: 'states', data: states, filled: true, stroked: true,
-      getFillColor: [20, 30, 48, 255], getLineColor: [44, 60, 86, 255], lineWidthMinPixels: 0.6,
+      getFillColor: [37, 42, 49, 255], getLineColor: [64, 72, 84, 255], lineWidthMinPixels: 0.6,
     }),
     // Legs not yet flown are faint; flown legs carry their root-cause colour; the selected leg is white.
     new ArcLayer<Leg>({
@@ -127,12 +124,12 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     new ScatterplotLayer<number>({
       id: 'airports', data: airports,
       getPosition: (a) => [day.airports[a].lon, day.airports[a].lat], getRadius: 5, radiusUnits: 'pixels',
-      getFillColor: [210, 222, 240, 255], stroked: true, getLineColor: [11, 18, 32, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
+      getFillColor: [246, 247, 249, 255], stroked: true, getLineColor: [28, 33, 39, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
     }),
     new ScatterplotLayer({
       id: 'plane-halo', data: plane ? [plane] : [],
       getPosition: (d) => d.pos, getRadius: 16, radiusUnits: 'pixels',
-      getFillColor: [76, 144, 240, 70], stroked: true, getLineColor: [76, 144, 240, 200], getLineWidth: 1.5, lineWidthUnits: 'pixels',
+      getFillColor: [45, 114, 210, 90], stroked: true, getLineColor: [76, 144, 240, 220], getLineWidth: 1.5, lineWidthUnits: 'pixels',
     }),
     new IconLayer({
       id: 'plane', data: plane ? [plane] : [],
@@ -207,7 +204,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       </div>
 
       <Card compact className="map-legend">
-        {LEGEND.map((c) => <span key={c}><i style={{ background: CAT_META[c].color }} />{CAT_META[c].short}</span>)}
+        <span><i style={{ background: '#4c90f0' }} />Arrived 15+ min late</span>
         <span><i style={{ background: '#8f99a8' }} />On time</span>
         <span><i className="sel" />Selected</span>
         <span><i className="future" />Not flown yet</span>
