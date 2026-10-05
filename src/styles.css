@@ -309,24 +309,10 @@ span.ws-tab { padding: 0; }
 .row.static .row-num { color: var(--ink-1); }
 
 
-/* ---------- app bar: icon + app name left, workspace navigation right */
-.appbar.bp6-navbar { flex-shrink: 0; height: 52px; padding: 0 0 0 var(--s-4); display: flex; align-items: center; gap: var(--s-4); background: var(--bg-head); box-shadow: inset 0 -1px 0 var(--line-strong); }
-.appbar .bp6-navbar-group { height: 52px; float: none; }
-.app-title { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; }
-.app-icon { width: 30px; height: 30px; display: grid; place-items: center; background: var(--bg-row); box-shadow: inset 0 0 0 1px var(--line-strong); }
-.app-icon img { display: block; }
-.app-title strong { font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
-.appbar .nav { margin-left: auto; height: 100%; display: flex; align-items: stretch; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.appbar .nav::-webkit-scrollbar { display: none; }
-.nav-item { position: relative; flex-shrink: 0; display: inline-flex; align-items: center; height: 100%; color: var(--ink-2); font-size: 13px; user-select: none; }
-.nav-item > button { display: inline-flex; align-items: center; gap: 8px; height: 100%; padding: 0 var(--s-4); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
-.nav-item > button.nav-close { padding: 0 var(--s-2) 0 0; margin-left: calc(-1 * var(--s-3)); color: var(--ink-3); }
-.nav-item:hover { color: var(--ink-1); background: rgba(255, 255, 255, 0.03); }
-.nav-item .bp6-icon { color: var(--ink-3); }
-.nav-item.on { color: var(--accent-hi); box-shadow: inset 0 -2px 0 var(--accent-hi); }
-.nav-item.on .bp6-icon { color: var(--accent-hi); }
-.nav-close:hover .bp6-icon { color: var(--ink-1); }
-.appbar .synthetic-tag { margin-right: var(--s-3); }
+/* ---------- top bar: logo + name, then browser-style workspace tabs */
+.brand.bp6-navbar-heading { display: inline-flex; align-items: center; gap: var(--s-2); margin-right: 0; font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
+.brand img { display: block; }
+.ws-tab, span.ws-tab, .ws-tab-label, .ws-tab-close { user-select: none; }
 
 /* ---------- KPI strip: icon tile, number, label */
 .kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1px; background: var(--line); box-shadow: 0 0 0 1px var(--line); }

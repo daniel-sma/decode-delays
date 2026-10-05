@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Callout, Classes, Code, H4, Icon, Navbar,
+  Alignment, Callout, Classes, Code, H4, Icon, Navbar, NavbarDivider, NavbarGroup, NavbarHeading,
   NonIdealState, Spinner, Tag,
 } from '@blueprintjs/core'
 import { flightLabel, loadDay, loadSummary, route, type Day, type Summary } from './data'
@@ -62,27 +62,34 @@ export default function App() {
 
   return (
     <div className="app">
-      <Navbar className="appbar">
-        <div className="app-title">
-          <span className="app-icon"><img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={20} height={20} /></span>
-          <strong>DeTrace</strong>
-        </div>
-        <nav className="nav" role="tablist" aria-label="Workspace">
-          <span role="tab" aria-selected={active == null} className={`nav-item${active == null ? ' on' : ''}`}>
-            <button onClick={() => setActive(null)}><Icon icon="th-list" size={16} /> Biggest delays</button>
-          </span>
-          {day && tabs.map((t) => (
-            <span key={t.id} role="tab" aria-selected={active === t.id} className={`nav-item${active === t.id ? ' on' : ''}`}>
-              <button onClick={() => setActive(t.id)} title={`${t.tail} · ${route(day, t.selected)}`}>
-                <Icon icon="airplane" size={16} /> {flightLabel(day, t.selected)} · {route(day, t.selected)}
-              </button>
-              <button className="nav-close" aria-label={`Close ${flightLabel(day, t.selected)}`} onClick={() => closeTab(t.id)}>
-                <Icon icon="small-cross" size={14} />
-              </button>
-            </span>
-          ))}
-        </nav>
-        {summary.synthetic && <Tag intent="warning" icon="warning-sign" className="synthetic-tag">Synthetic sample data</Tag>}
+      <Navbar className="topbar">
+        <NavbarGroup align={Alignment.START} className="topbar-left">
+          <NavbarHeading className="brand">
+            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={22} height={22} />
+            <span>DeTrace</span>
+          </NavbarHeading>
+          <NavbarDivider />
+          <div className="tabs" role="tablist">
+            <button role="tab" aria-selected={active == null} className={`ws-tab${active == null ? ' on' : ''}`} onClick={() => setActive(null)}>
+              <Icon icon="th-list" size={14} /> Biggest delays
+            </button>
+            {day && tabs.map((t) => (
+              <span key={t.id} role="tab" aria-selected={active === t.id} className={`ws-tab${active === t.id ? ' on' : ''}`}>
+                <button className="ws-tab-label" onClick={() => setActive(t.id)} title={`${t.tail} · ${route(day, t.selected)}`}>
+                  <Icon icon="airplane" size={14} /> {flightLabel(day, t.selected)} · {route(day, t.selected)}
+                </button>
+                <button className="ws-tab-close" aria-label={`Close ${flightLabel(day, t.selected)}`} onClick={() => closeTab(t.id)}>
+                  <Icon icon="small-cross" size={14} />
+                </button>
+              </span>
+            ))}
+          </div>
+        </NavbarGroup>
+        {summary.synthetic && (
+          <NavbarGroup align={Alignment.END}>
+            <Tag intent="warning" icon="warning-sign" className="synthetic-tag">Synthetic sample data</Tag>
+          </NavbarGroup>
+        )}
       </Navbar>
       {summary.synthetic && (
         <Callout intent="warning" compact className="synthetic-callout" icon="warning-sign">
