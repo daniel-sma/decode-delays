@@ -1,20 +1,24 @@
-import { Button, MenuItem } from '@blueprintjs/core'
+import { Button, MenuItem, Tooltip } from '@blueprintjs/core'
 import type { IconName } from '@blueprintjs/icons'
 import { Select, type ItemRenderer } from '@blueprintjs/select'
 
 export interface Option<V> { value: V; label: string; count?: number; icon?: IconName }
 
-/** A Blueprint Select used as a table filter: shows "Label: value", highlights when set. */
-export default function FilterSelect<V extends string | number | null>({ label, icon, options, value, onChange, searchable }: {
+/**
+ * A Blueprint Select used as a table filter. Meant to sit in a ButtonGroup: default button, icon + value,
+ * filter name in the tooltip; an active filter shows a blue icon and bold value instead of a filled button.
+ */
+export default function FilterSelect<V extends string | number | null>({ label, icon, options, value, onChange, searchable, isDefault }: {
   label: string
   icon: IconName
   options: Option<V>[]
   value: V
   onChange: (v: V) => void
   searchable?: boolean
+  /** true when `value` is the unfiltered state */
+  isDefault: boolean
 }) {
   const current = options.find((o) => o.value === value)
-  const isSet = value !== null && value !== options[0]?.value
 
   const render: ItemRenderer<Option<V>> = (o, { handleClick, handleFocus, modifiers }) => {
     if (!modifiers.matchesPredicate) return null
@@ -45,15 +49,15 @@ export default function FilterSelect<V extends string | number | null>({ label, 
       popoverProps={{ minimal: true, placement: 'bottom-start' }}
       resetOnClose
     >
-      <Button
-        icon={icon}
-        rightIcon="caret-down"
-        size="small"
-        variant={isSet ? 'solid' : 'outlined'}
-        intent={isSet ? 'primary' : 'none'}
-        className="filter-btn"
-        text={<><span className="filter-label">{label}:</span> {current?.label ?? 'Any'}</>}
-      />
+      <Tooltip content={label} placement="top" hoverOpenDelay={400} openOnTargetFocus={false}>
+        <Button
+          icon={icon}
+          endIcon="caret-down"
+          text={current?.label ?? 'Any'}
+          className={`filter-btn${isDefault ? '' : ' active'}`}
+          aria-label={`${label}: ${current?.label ?? 'Any'}`}
+        />
+      </Tooltip>
     </Select>
   )
 }

@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
+import { Button, ButtonGroup, Callout, Classes, InputGroup, NonIdealState, Section, SectionCard } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
-import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root } from '../data'
-import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
+import { CATS, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day } from '../data'
+import { CAT_META, REPORTED_META, clock, fmt, pct, prettyDate } from '../theme'
 import { RippleChain, Stat, statusTag } from './Panels'
 import CatLabel from './CatLabel'
 import FilterSelect from './FilterSelect'
@@ -147,7 +147,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
           <Stat label="Traced to weather" value={pct(t.decoded.weather, repTotal)} />
         </div>
 
-        <RootCauseCheck day={day} roots={roots} filter={filter} onFilter={setFilter} />
 
         <Section
           className="home-table-section"
@@ -166,29 +165,36 @@ export default function HomeView({ day, onOpenFlight }: Props) {
               spellCheck={false}
             />
             <div className="filter-bar">
-              <FilterSelect<Status>
-                label="Status" icon="time" value={filter.status} onChange={(status) => setFilter({ ...filter, status })}
-                options={[
-                  { value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' },
-                  { value: 'cancelled', label: 'Cancelled' }, { value: 'ontime', label: 'On time' }, { value: 'all', label: 'All flights' },
-                ]}
-              />
-              <FilterSelect<string | null>
-                label="Airline" icon="airplane" value={filter.carrier} onChange={(carrier) => setFilter({ ...filter, carrier })} searchable
-                options={[{ value: null, label: 'Any' }, ...carriers.map(([c, n]) => ({ value: c, label: c, count: n }))]}
-              />
-              <FilterSelect<number | null>
-                label="Root cause" icon="diagnosis" value={filter.cat} onChange={(cat) => setFilter({ ...filter, cat, airport: null })}
-                options={[{ value: null, label: 'Any' }, ...CATS.map((c, k) => ({ value: k, label: CAT_META[c].label, icon: CAT_META[c].icon }))]}
-              />
-              <FilterSelect<number | null>
-                label="Started at" icon="map-marker" value={filter.airport} onChange={(airport) => setFilter({ ...filter, airport })} searchable
-                options={[{ value: null, label: 'Any' }, ...rootAirports.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
-              />
-              <FilterSelect<number | null>
-                label="Airport" icon="locate" value={filter.at} onChange={(at) => setFilter({ ...filter, at })} searchable
-                options={[{ value: null, label: 'Any' }, ...airportsUsed.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
-              />
+              <ButtonGroup className="filter-group">
+                <FilterSelect<Status>
+                  label="Status" icon="time" value={filter.status} isDefault={filter.status === 'delayed'}
+                  onChange={(status) => setFilter({ ...filter, status })}
+                  options={[
+                    { value: 'delayed', label: 'Delayed 15+ min' }, { value: 'severe', label: 'Delayed 3h+' },
+                    { value: 'cancelled', label: 'Cancelled' }, { value: 'ontime', label: 'On time' }, { value: 'all', label: 'All flights' },
+                  ]}
+                />
+                <FilterSelect<string | null>
+                  label="Airline" icon="airplane" value={filter.carrier} isDefault={filter.carrier == null} searchable
+                  onChange={(carrier) => setFilter({ ...filter, carrier })}
+                  options={[{ value: null, label: 'Any airline' }, ...carriers.map(([c, n]) => ({ value: c, label: c, count: n }))]}
+                />
+                <FilterSelect<number | null>
+                  label="Root cause" icon="diagnosis" value={filter.cat} isDefault={filter.cat == null}
+                  onChange={(cat) => setFilter({ ...filter, cat, airport: null })}
+                  options={[{ value: null, label: 'Any root cause' }, ...CATS.map((c, k) => ({ value: k, label: CAT_META[c].label, icon: CAT_META[c].icon }))]}
+                />
+                <FilterSelect<number | null>
+                  label="Delay started at" icon="map-marker" value={filter.airport} isDefault={filter.airport == null} searchable
+                  onChange={(airport) => setFilter({ ...filter, airport })}
+                  options={[{ value: null, label: 'Started anywhere' }, ...rootAirports.map(([a, n]) => ({ value: a, label: `Started at ${day.airports[a].code}`, count: n }))]}
+                />
+                <FilterSelect<number | null>
+                  label="Airport (origin or destination)" icon="locate" value={filter.at} isDefault={filter.at == null} searchable
+                  onChange={(at) => setFilter({ ...filter, at })}
+                  options={[{ value: null, label: 'Any airport' }, ...airportsUsed.map(([a, n]) => ({ value: a, label: day.airports[a].code, count: n }))]}
+                />
+              </ButtonGroup>
               {filtersSet && <Button variant="minimal" size="small" icon="filter-remove" text="Clear filters" onClick={() => setFilter(NO_FILTER)} />}
               <span className="filter-count">{fmt(rows.length)} {rows.length === 1 ? 'flight' : 'flights'}</span>
             </div>
@@ -229,63 +235,6 @@ export default function HomeView({ day, onOpenFlight }: Props) {
         </Section>
       </div>
     </div>
-  )
-}
-
-/** Foundry-style check list: one row per root cause, with the airports behind it as filter chips. */
-function RootCauseCheck({ day, roots, filter, onFilter }: {
-  day: Day; roots: (Root | null)[]; filter: Filter; onFilter: (f: Filter) => void
-}) {
-  const groups = useMemo(() => CATS.map((_, c) => {
-    const byAp = new Map<number, number>()
-    let flights = 0
-    roots.forEach((r) => {
-      if (r?.cat !== c) return
-      flights++
-      byAp.set(r.airport, (byAp.get(r.airport) ?? 0) + 1)
-    })
-    return { c, flights, minutes: day.totals.decoded[CATS[c]], airports: [...byAp].sort((a, b) => b[1] - a[1]).slice(0, 5) }
-  }).filter((g) => g.flights > 0), [day, roots])
-
-  return (
-    <Section compact title="Root causes" icon="diagnosis" subtitle="Flights by their biggest root cause · click a cause or airport to filter">
-      <SectionCard padded={false}>
-        <ul className="checks" style={{ ['--cols' as string]: groups.length }}>
-          {groups.map((g) => {
-            const meta = CAT_META[CATS[g.c]]
-            const catOn = filter.cat === g.c && filter.airport == null
-            return (
-              <li key={g.c} className={filter.cat === g.c ? 'on' : ''}>
-                <button className="check-main" aria-pressed={catOn} onClick={() => onFilter(catOn ? { ...filter, cat: null, airport: null } : { ...filter, cat: g.c, airport: null })}>
-                  <strong><Icon icon={meta.icon} size={16} />{meta.label}</strong>
-                  <span className="check-tags">
-                    <Tag minimal>{fmt(g.flights)} flights</Tag>
-                    <Tag minimal>{dur(g.minutes)}</Tag>
-                  </span>
-                </button>
-                <div className="check-detail">
-                  {g.airports.map(([ap, n]) => {
-                    const on = filter.cat === g.c && filter.airport === ap
-                    return (
-                      <Tag
-                        key={ap}
-                        interactive
-                        minimal={!on}
-                        intent={on ? 'primary' : 'none'}
-                        className="ap-chip"
-                        onClick={() => onFilter(on ? { ...filter, cat: g.c, airport: null } : { ...filter, cat: g.c, airport: ap })}
-                      >
-                        <strong>{day.airports[ap].code}</strong> {n}
-                      </Tag>
-                    )
-                  })}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      </SectionCard>
-    </Section>
   )
 }
 
