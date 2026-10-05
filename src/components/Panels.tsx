@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { AnchorButton, Button, Card, Classes, H3, HTMLTable, Section, SectionCard, Tag } from '@blueprintjs/core'
 import {
   CATS, REPORTED, decodedByCat, decodedForArrivals, flightLabel, reportedForArrivals, route, sum, tailChain,
   type Arc, type Day, type Summary,
@@ -17,7 +18,6 @@ export function OverviewPanel({ day, summary, onDay, onSelect }: {
   const t = day.totals
   const rep = REPORTED.map((k) => t.reported[k])
   const dec = CATS.map((k) => t.decoded[k])
-  const total = sum(rep)
   const cancelled = sum(Object.values(t.cancelled))
 
   const exporters = useMemo(() =>
@@ -30,33 +30,34 @@ export function OverviewPanel({ day, summary, onDay, onSelect }: {
 
   return (
     <div className="panel-body">
-      <p className="eyebrow">{prettyDate(day.date)} · {fmt(t.flights)} flights · {fmt(cancelled)} cancelled</p>
-      <h2 className="headline">
-        Airlines filed <em>{pct(t.reported.late, total)}</em> of today’s delay as “late aircraft.” Traced back plane by plane,{' '}
-        <em style={{ color: CAT_META.weather.color }}>{pct(t.decoded.weather, total)}</em> started with weather.
-      </h2>
-      <p className="lede">
-        “Late aircraft” only means the plane showed up late from its last flight. We follow each tail number
-        upstream to the flight where the delay actually began, and check the weather at that airport and hour.
-      </p>
+      <div>
+        <p className="eyebrow">{prettyDate(day.date)} · {fmt(t.flights)} flights · {fmt(cancelled)} cancelled</p>
+        <H3 className="panel-title">The day, decoded</H3>
+        <p className={`lede ${Classes.TEXT_MUTED}`}>
+          “Late aircraft” only means the plane showed up late from its last flight. Each tail number is followed
+          upstream to where the delay actually began.
+        </p>
+      </div>
 
-      <CauseCompare reported={rep} decoded={dec} />
+      <Section compact title="Reported vs decoded" icon="comparison">
+        <SectionCard><CauseCompare reported={rep} decoded={dec} /></SectionCard>
+      </Section>
 
-      <section>
-        <h3>Where delay was exported from</h3>
-        <p className="hint">Minutes that started at this airport but were felt somewhere else.</p>
-        <ul className="rank">
-          {exporters.map(({ i, a, exported, dom }) => (
-            <li key={a.code}>
-              <button onClick={() => onSelect({ type: 'airport', index: i })}>
-                <span className="rank-code">{a.code}</span>
-                <span className="rank-bar"><span style={{ width: `${(100 * exported) / maxExp}%`, background: CAT_META[CATS[dom]].color }} /></span>
-                <span className="rank-val">{dur(exported)}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Section compact title="Where delay was exported from" icon="export" subtitle="Started here, felt somewhere else">
+        <SectionCard padded={false}>
+          <HTMLTable compact interactive className="rank-table">
+            <tbody>
+              {exporters.map(({ i, a, exported, dom }) => (
+                <tr key={a.code} onClick={() => onSelect({ type: 'airport', index: i })}>
+                  <td className="rank-code">{a.code}</td>
+                  <td className="rank-bar-cell"><span className="rank-bar"><span style={{ width: `${(100 * exported) / maxExp}%`, background: CAT_META[CATS[dom]].color }} /></span></td>
+                  <td className="num">{dur(exported)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </HTMLTable>
+        </SectionCard>
+      </Section>
 
       <MonthStrip summary={summary} current={day.date} onDay={onDay} />
       <Method summary={summary} />
@@ -68,48 +69,50 @@ function MonthStrip({ summary, current, onDay }: { summary: Summary; current: st
   const [hover, setHover] = useState<string | null>(null)
   const max = Math.max(...summary.days.map((d) => d.delayed + d.cancelled))
   const h = summary.days.find((d) => d.date === hover)
+  const month = new Date(summary.month + '-01T00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
   return (
-    <section>
-      <h3>{new Date(summary.month + '-01T00:00Z').toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}</h3>
-      <p className="hint">{h ? `${prettyDate(h.date)}: ${fmt(h.delayed)} delayed, ${fmt(h.cancelled)} cancelled` : 'Delayed + cancelled flights per day. Highlighted days are explorable.'}</p>
-      <div className="month" onMouseLeave={() => setHover(null)}>
-        {summary.days.map((d) => {
-          const ok = summary.availableDays.includes(d.date)
-          return (
-            <button
-              key={d.date}
-              className={`month-day${d.date === current ? ' current' : ''}${ok ? ' ok' : ''}`}
-              disabled={!ok}
-              onClick={() => ok && onDay(d.date)}
-              onMouseEnter={() => setHover(d.date)}
-              aria-label={`${prettyDate(d.date)}: ${d.delayed} delayed`}
-            >
-              <span style={{ height: `${(100 * (d.delayed + d.cancelled)) / max}%` }} />
-            </button>
-          )
-        })}
-      </div>
-    </section>
+    <Section compact title={month} icon="calendar" subtitle={h ? `${prettyDate(h.date)}: ${fmt(h.delayed)} delayed, ${fmt(h.cancelled)} cancelled` : 'Delayed + cancelled flights per day'}>
+      <SectionCard>
+        <div className="month" onMouseLeave={() => setHover(null)}>
+          {summary.days.map((d) => {
+            const ok = summary.availableDays.includes(d.date)
+            return (
+              <button
+                key={d.date}
+                className={`month-day${d.date === current ? ' current' : ''}${ok ? ' ok' : ''}`}
+                disabled={!ok}
+                onClick={() => ok && onDay(d.date)}
+                onMouseEnter={() => setHover(d.date)}
+                aria-label={`${prettyDate(d.date)}: ${d.delayed} delayed`}
+              >
+                <span style={{ height: `${(100 * (d.delayed + d.cancelled)) / max}%` }} />
+              </button>
+            )
+          })}
+        </div>
+      </SectionCard>
+    </Section>
   )
 }
 
 function Method({ summary }: { summary: Summary }) {
   const tr = summary.trace
   return (
-    <details className="method">
-      <summary>How the decoding works</summary>
-      <ol>
-        <li>BTS requires airlines to split every arrival delay of 15+ minutes into five causes: carrier, weather, NAS (air traffic), security and late aircraft.</li>
-        <li>Each flight is linked to the previous flight flown by the same tail number, if it left from where that one landed within 16 hours.</li>
-        <li>A flight’s late-aircraft minutes are split across the previous flight’s own decoded causes, in proportion, recursively, so delay can be traced several legs back.</li>
-        <li>NAS and weather minutes are placed at whichever end of the flight had thunderstorms, IFR conditions or gusts of 35 kt or more (ASOS/METAR within an hour). NAS with weather on record counts as weather; otherwise it stays as airspace and volume.</li>
-        <li>Any minutes that can’t be traced stay grey. Nothing is invented.</li>
-      </ol>
-      <p className="hint">
-        This month: {pct(tr.lateTraced, tr.lateMinutes)} of {fmt(tr.lateMinutes)} late-aircraft minutes traced to a root cause.
-        Source: {summary.source}. Times in Eastern.
-      </p>
-    </details>
+    <Section compact collapsible collapseProps={{ defaultIsOpen: false }} title="How the decoding works" icon="info-sign">
+      <SectionCard className="method">
+        <ol>
+          <li>BTS requires airlines to split every arrival delay of 15+ minutes into five causes: carrier, weather, NAS (air traffic), security and late aircraft.</li>
+          <li>Each flight is linked to the previous flight flown by the same tail number, if it left from where that one landed within 16 hours.</li>
+          <li>A flight’s late-aircraft minutes are split across the previous flight’s own decoded causes, in proportion, recursively, so delay can be traced several legs back.</li>
+          <li>NAS and weather minutes are placed at whichever end of the flight had thunderstorms, IFR conditions or gusts of 35 kt or more (ASOS/METAR within an hour). NAS with weather on record counts as weather; otherwise it stays as airspace and volume.</li>
+          <li>Any minutes that can’t be traced stay grey. Nothing is invented.</li>
+        </ol>
+        <p className={Classes.TEXT_MUTED}>
+          This month: {pct(tr.lateTraced, tr.lateMinutes)} of {fmt(tr.lateMinutes)} late-aircraft minutes traced to a root cause.
+          Source: {summary.source}. Times in Eastern.
+        </p>
+      </SectionCard>
+    </Section>
   )
 }
 
@@ -134,49 +137,52 @@ export function AirportPanel({ day, index, onSelect }: { day: Day; index: number
     const f = day.flights
     const xs: number[] = []
     for (let i = 0; i < f.o.length; i++) if (!f.otherDay[i] && (f.o[i] === index || f.d[i] === index)) xs.push(i)
-    return xs.sort((x, y) => (f.arrDelay[y] ?? -1) - (f.arrDelay[x] ?? -1)).slice(0, 5)
+    return xs.sort((x, y) => (f.arrDelay[y] ?? -1) - (f.arrDelay[x] ?? -1)).slice(0, 6)
   }, [day, index])
 
   return (
     <div className="panel-body">
-      <p className="eyebrow">{a.city}</p>
-      <h2 className="title">{a.code} <span>{a.name}</span></h2>
+      <div>
+        <p className="eyebrow">{a.city}</p>
+        <H3 className="panel-title">{a.code}</H3>
+        <p className={Classes.TEXT_MUTED}>{a.name}</p>
+      </div>
       <div className="stats">
         <Stat label="Departures" value={fmt(deps)} />
         <Stat label="Left 15+ min late" value={pct(delayed, deps)} />
         <Stat label="Cancelled" value={fmt(cancelled)} />
       </div>
 
-      <section>
-        <h3>Delay landing at {a.code}</h3>
-        <CauseCompare reported={reportedForArrivals(day, index)} decoded={decodedForArrivals(day, index)} />
-      </section>
+      <Section compact title={`Delay landing at ${a.code}`} icon="airplane">
+        <SectionCard><CauseCompare reported={reportedForArrivals(day, index)} decoded={decodedForArrivals(day, index)} /></SectionCard>
+      </Section>
 
-      <section>
-        <h3>Delay that started at {a.code}</h3>
-        <p className="hint">{dur(originTotal)} total, {pct(exported, originTotal)} of it felt at other airports.</p>
-        <HourBars rows={a.origin} />
+      <Section compact title={`Delay that started at ${a.code}`} icon="export" subtitle={`${dur(originTotal)} total · ${pct(exported, originTotal)} felt elsewhere`}>
+        <SectionCard>
+          <HourBars rows={a.origin} />
+        </SectionCard>
         {destinations.length > 0 && (
-          <ul className="rank compact">
-            {destinations.map(([d, m]) => (
-              <li key={d}>
-                <button onClick={() => onSelect({ type: 'airport', index: d })}>
-                  <span className="rank-code">→ {day.airports[d].code}</span>
-                  <span className="rank-bar"><span style={{ width: `${(100 * m) / destinations[0][1]}%` }} /></span>
-                  <span className="rank-val">{dur(m)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <SectionCard padded={false}>
+            <HTMLTable compact interactive className="rank-table">
+              <tbody>
+                {destinations.map(([d, m]) => (
+                  <tr key={d} onClick={() => onSelect({ type: 'airport', index: d })}>
+                    <td className="rank-code">→ {day.airports[d].code}</td>
+                    <td className="rank-bar-cell"><span className="rank-bar"><span style={{ width: `${(100 * m) / destinations[0][1]}%` }} /></span></td>
+                    <td className="num">{dur(m)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </HTMLTable>
+          </SectionCard>
         )}
-      </section>
+      </Section>
 
       {wx && <WeatherStrip wx={wx} />}
 
-      <section>
-        <h3>Most-delayed flights</h3>
-        <FlightList day={day} ids={worst} onSelect={onSelect} />
-      </section>
+      <Section compact title="Most-delayed flights" icon="sort-desc">
+        <SectionCard padded={false}><FlightList day={day} ids={worst} onSelect={onSelect} /></SectionCard>
+      </Section>
     </div>
   )
 }
@@ -204,24 +210,24 @@ function WeatherStrip({ wx }: { wx: ([number, number, number, string] | null)[] 
   const [hover, setHover] = useState<number | null>(null)
   const h = hover != null ? wx[hover] : null
   return (
-    <section>
-      <h3>Weather on record</h3>
-      <div className="wx" onMouseLeave={() => setHover(null)}>
-        {wx.map((x, i) => (
-          <span
-            key={i}
-            className={`wx-cell${x?.[0] ? ' ts' : x?.[1] ? ' ifr' : ''}${x == null ? ' none' : ''}`}
-            onMouseEnter={() => setHover(i)}
-            title={x?.[3] ?? 'No observation'}
-          />
-        ))}
-      </div>
-      <div className="wx-legend">
-        <span><i className="wx-cell ts" /> Thunderstorm</span>
-        <span><i className="wx-cell ifr" /> IFR (vis &lt; 3 mi or ceiling &lt; 1,000 ft)</span>
-      </div>
-      <p className="metar">{h ? <><b>{hourLabel(hover!)} ET</b> {h[3]}</> : hover != null ? 'No observation' : 'Hover an hour to read the METAR.'}</p>
-    </section>
+    <Section compact title="Weather on record" icon="cloud" subtitle="Hourly ASOS / METAR, Eastern time">
+      <SectionCard>
+        <div className="wx" onMouseLeave={() => setHover(null)}>
+          {wx.map((x, i) => (
+            <span
+              key={i}
+              className={`wx-cell${x?.[0] ? ' ts' : x?.[1] ? ' ifr' : ''}${x == null ? ' none' : ''}`}
+              onMouseEnter={() => setHover(i)}
+            />
+          ))}
+        </div>
+        <div className="wx-legend">
+          <span><i className="wx-cell ts" /> Thunderstorm</span>
+          <span><i className="wx-cell ifr" /> IFR (vis &lt; 3 mi or ceiling &lt; 1,000 ft)</span>
+        </div>
+        <p className="metar">{h ? <><b>{hourLabel(hover!)} ET</b> {h[3]}</> : hover != null ? 'No observation' : 'Hover an hour to read the METAR.'}</p>
+      </SectionCard>
+    </Section>
   )
 }
 
@@ -255,8 +261,7 @@ export function FlightPanel({ day, index, onSelect }: { day: Day; index: number;
 
   let sentence: React.ReactNode
   if (status.startsWith('C')) {
-    const code = status.slice(1)
-    sentence = <>Cancelled. Airline reported the cause as <b>{CANCEL[code] ?? 'unknown'}</b>.</>
+    sentence = <>Cancelled. Airline reported the cause as <b>{CANCEL[status.slice(1)] ?? 'unknown'}</b>.</>
   } else if (status === 'D') {
     sentence = <>Diverted to another airport.</>
   } else if (arr == null || arr < 15) {
@@ -273,7 +278,7 @@ export function FlightPanel({ day, index, onSelect }: { day: Day; index: number;
             {top[1].c[4] > 1 ? <>, mostly from {top[1].c[4]} flights earlier</> : <> from the previous flight</>}:{' '}
             <span style={{ color: CAT_META[CATS[top[1].c[0]]].color }}>{CAT_META[CATS[top[1].c[0]]].label.toLowerCase()}</span>{' '}
             at <b>{day.airports[top[1].c[1]]?.code ?? '?'}</b> around {clock(top[1].c[3])}, on{' '}
-            <button className="inline" onClick={() => onSelect({ type: 'flight', index: top[0] })}>{flightLabel(day, top[0])}</button>.
+            <AnchorButton variant="minimal" size="small" intent="primary" className="inline-btn" onClick={() => onSelect({ type: 'flight', index: top[0] })}>{flightLabel(day, top[0])}</AnchorButton>.
           </>
         )}
       </>
@@ -282,24 +287,29 @@ export function FlightPanel({ day, index, onSelect }: { day: Day; index: number;
 
   return (
     <div className="panel-body">
-      <p className="eyebrow">{f.tail[index] || 'No tail number'} · {clock(f.sdep[index])} departure</p>
-      <h2 className="title">{flightLabel(day, index)} <span>{route(day, index)}</span></h2>
-      <p className="sentence">{sentence}</p>
+      <div>
+        <p className="eyebrow">{f.tail[index] || 'No tail number'} · {clock(f.sdep[index])} departure</p>
+        <H3 className="panel-title">{flightLabel(day, index)}</H3>
+        <p className={Classes.TEXT_MUTED}>{route(day, index)}</p>
+      </div>
+      <Card compact className="sentence-card"><p className="sentence">{sentence}</p></Card>
 
       {f.causes[index] && (
-        <CauseCompare reported={f.causes[index]!} decoded={decodedByCat(contribs)} />
+        <Section compact title="Reported vs decoded" icon="comparison">
+          <SectionCard><CauseCompare reported={f.causes[index]!} decoded={decodedByCat(contribs)} /></SectionCard>
+        </Section>
       )}
 
-      <section>
-        <h3>The plane’s day</h3>
-        <p className="hint">Every flight this aircraft flew. Hatched = delay it brought in from the leg before.</p>
-        <RippleChain day={day} chain={chain} selected={index} roots={rootSet} onSelect={onSelect} />
-      </section>
+      <Section compact title="The plane’s day" icon="airplane" subtitle="Hatched = delay brought in from the leg before">
+        <SectionCard>
+          <RippleChain day={day} chain={chain} selected={index} roots={rootSet} onSelect={onSelect} />
+        </SectionCard>
+      </Section>
     </div>
   )
 }
 
-function RippleChain({ day, chain, selected, roots, onSelect }: {
+export function RippleChain({ day, chain, selected, roots, onSelect }: {
   day: Day; chain: number[]; selected: number; roots: Set<number>; onSelect: (s: Selection) => void
 }) {
   const f = day.flights
@@ -318,9 +328,9 @@ function RippleChain({ day, chain, selected, roots, onSelect }: {
               <span className="chain-time">{clock(f.sdep[i])}</span>
               <span className="chain-route">
                 {route(day, i)} <small>{flightLabel(day, i)}</small>
-                {roots.has(i) && <em className="badge">delay started here</em>}
+                {roots.has(i) && <Tag minimal intent="primary" className="badge">delay started here</Tag>}
               </span>
-              <span className="chain-delay">{cancelled ? 'Cancelled' : arr == null ? '—' : arr >= 15 ? `+${dur(arr)}` : 'On time'}</span>
+              <span className="chain-delay">{cancelled ? <Tag minimal intent="danger">Cancelled</Tag> : arr == null ? '—' : arr >= 15 ? `+${dur(arr)}` : 'On time'}</span>
               <span className="chain-bar">
                 {by.map((v, c) => v > 0 && <span key={`o${c}`} style={{ width: `${(100 * v) / max}%`, background: CAT_META[CATS[c]].color }} />)}
                 {inh.map((v, c) => v > 0 && <span key={`i${c}`} className="hatch" style={{ width: `${(100 * v) / max}%`, ['--seg' as string]: CAT_META[CATS[c]].color }} />)}
@@ -340,13 +350,19 @@ export function ArcPanel({ day, arc, onSelect }: { day: Day; arc: Arc; onSelect:
   const c = CAT_META[CATS[cat]]
   return (
     <div className="panel-body">
-      <p className="eyebrow">Delay carried by aircraft · landing {hourLabel(h)}–{hourLabel(h + 1)} ET</p>
-      <h2 className="title">{day.airports[s].code} → {day.airports[t].code}</h2>
-      <p className="sentence">
-        <b>{dur(minutes)}</b> of <span style={{ color: c.color }}>{c.label.toLowerCase()}</span> delay that began at{' '}
-        <b>{day.airports[s].code}</b> reached <b>{day.airports[t].code}</b> on {ids.length} flight{ids.length === 1 ? '' : 's'}.
-      </p>
-      <FlightList day={day} ids={ids} onSelect={onSelect} />
+      <div>
+        <p className="eyebrow">Delay carried by aircraft · landing {hourLabel(h)}–{hourLabel(h + 1)} ET</p>
+        <H3 className="panel-title">{day.airports[s].code} → {day.airports[t].code}</H3>
+      </div>
+      <Card compact className="sentence-card">
+        <p className="sentence">
+          <b>{dur(minutes)}</b> of <span style={{ color: c.color }}>{c.label.toLowerCase()}</span> delay that began at{' '}
+          <b>{day.airports[s].code}</b> reached <b>{day.airports[t].code}</b> on {ids.length} flight{ids.length === 1 ? '' : 's'}.
+        </p>
+      </Card>
+      <Section compact title="Flights" icon="airplane">
+        <SectionCard padded={false}><FlightList day={day} ids={ids} onSelect={onSelect} /></SectionCard>
+      </Section>
     </div>
   )
 }
@@ -356,26 +372,30 @@ export function ArcPanel({ day, arc, onSelect }: { day: Day; arc: Arc; onSelect:
 export function FlightList({ day, ids, onSelect }: { day: Day; ids: number[]; onSelect: (s: Selection) => void }) {
   const f = day.flights
   return (
-    <ul className="flights">
-      {ids.map((i) => (
-        <li key={i}>
-          <button onClick={() => onSelect({ type: 'flight', index: i })}>
-            <span className="fl-label">{flightLabel(day, i)}</span>
-            <span className="fl-route">{route(day, i)}</span>
-            <span className="fl-delay">{f.status[i].startsWith('C') ? 'Cancelled' : f.arrDelay[i] != null ? `+${dur(Math.max(0, f.arrDelay[i]!))}` : '—'}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <HTMLTable compact interactive className="flight-table">
+      <tbody>
+        {ids.map((i) => (
+          <tr key={i} onClick={() => onSelect({ type: 'flight', index: i })}>
+            <td><strong>{flightLabel(day, i)}</strong></td>
+            <td className={Classes.TEXT_MUTED}>{route(day, i)}</td>
+            <td className="num">{f.status[i].startsWith('C') ? <Tag minimal intent="danger">Cancelled</Tag> : f.arrDelay[i] != null ? `+${dur(Math.max(0, f.arrDelay[i]!))}` : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </HTMLTable>
   )
+}
+
+export function BackButton({ onClick }: { onClick: () => void }) {
+  return <Button variant="minimal" size="small" icon="arrow-left" text="Day overview" onClick={onClick} className="back" />
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="stat">
+    <Card compact className="stat">
       <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
-    </div>
+    </Card>
   )
 }
 

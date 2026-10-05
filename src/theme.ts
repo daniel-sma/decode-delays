@@ -1,12 +1,13 @@
 import type { Cat, Reported } from './data'
 
-// Dark-mode categorical slots, validated all-pairs for the map (see README → Colour).
+// Blueprint palette steps (blue4, turquoise3, vermilion3), validated all-pairs for colour-vision
+// deficiency on Blueprint dark-gray-1. Vermilion, not orange, so airline never reads as a warning intent.
 export const COLOR = {
-  blue: '#3987e5',
-  orange: '#d95926',
-  aqua: '#199e70',
-  violet: '#9085e9',
-  gray: '#898781',
+  blue: '#4c90f0', // --bp-palette-blue-4
+  aqua: '#00a396', // --bp-palette-turquoise-3
+  orange: '#d33d17', // --bp-palette-vermilion-3
+  violet: '#9881f3', // --bp-palette-indigo-4
+  gray: '#8f99a8', // --bp-palette-gray-3
 }
 
 export const CAT_META: Record<Cat, { label: string; short: string; color: string; blurb: string }> = {

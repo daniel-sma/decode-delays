@@ -72,18 +72,23 @@ Outputs go to `public/data/`: `summary.json` (month strip and trace stats) and `
 
 ## App structure
 
+The UI is built on **[Blueprint](https://blueprintjs.com/docs/)** (`@blueprintjs/core`, `icons`, `table`, v6),
+Palantir's open-source React toolkit for data-dense interfaces, in its dark theme.
+
 | File | What it does |
 |---|---|
-| `src/App.tsx` | Layout, day/hour/mode/selection state, play loop |
+| `src/App.tsx` | Blueprint `Navbar` (view switch, day `SegmentedControl`), hash routes `#/` (home) and `#/map`, play loop |
+| `src/components/HomeView.tsx` | **Home:** headline, stat `Card`s, reported vs decoded bars, tail-number search (`InputGroup`) above a `Table2` of the biggest delays. Searching one tail shows its day in order. Click a row to trace it on the map. |
 | `src/components/DelayMap.tsx` | deck.gl map: airport circles (size = minutes, colour = dominant root cause), arcs = delay carried by aircraft from root airport to where it landed, the selected plane's legs in white |
-| `src/components/Timeline.tsx` | Hourly stacked bars, scrub and play through the day (Eastern time) |
-| `src/components/Panels.tsx` | Day overview, airport, flight (with the plane's tail chain) and arc panels |
+| `src/components/Timeline.tsx` | Hourly stacked bars in a `Card`, scrub and play through the day (Eastern time) |
+| `src/components/Panels.tsx` | Map side panel: day overview, airport, flight (with the plane's tail chain) and arc views, built from `Section`/`SectionCard`, `HTMLTable` and `Tag` |
 | `src/components/CauseCompare.tsx` | Reported vs decoded 100% bars, the core comparison |
-| `src/theme.ts`, `src/styles.css` | Colour tokens, category labels, formatting. Design passes start here. |
+| `src/theme.ts`, `src/styles.css` | Category colours and labels, formatting, layout. Colours reference Blueprint design tokens. |
 
-**Colour:** weather `#3987e5`, airspace `#199e70`, airline `#d95926`, untraced/late-aircraft `#898781`
-(hatched). The three hues pass an all-pairs colour-vision-deficiency check on the dark surface `#1a1a19`.
-Security (`#9085e9`) only appears in bars, never on the map.
+**Colour (Blueprint palette):** weather blue-4 `#4c90f0`, airspace turquoise-3 `#00a396`, airline
+vermilion-3 `#d33d17`, untraced/late-aircraft gray-3 `#8f99a8` (hatched). The three hues pass an all-pairs
+colour-vision-deficiency check on dark-gray-1 `#1c2127`. Vermilion rather than orange keeps "airline"
+from reading as Blueprint's warning intent. Security (indigo-4 `#9881f3`) only appears in bars.
 
 ## Built with AI
 

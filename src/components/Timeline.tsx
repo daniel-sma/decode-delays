@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { Button, Card } from '@blueprintjs/core'
 import { CATS, type Day } from '../data'
 import { CAT_META, dur, hourLabel } from '../theme'
 
@@ -24,20 +25,19 @@ export default function Timeline({ day, hour, mode, playing, onHour, onPlay }: P
   const max = Math.max(1, ...hours.map((h) => h.reduce((a, b) => a + b, 0)))
 
   return (
-    <div className="timeline">
+    <Card className="timeline" compact>
       <div className="timeline-controls">
-        <button className="play" onClick={() => onPlay(!playing)} aria-label={playing ? 'Pause' : 'Play the day'}>
-          {playing ? (
-            <svg viewBox="0 0 16 16" width="14" height="14"><rect x="3" y="2" width="3.5" height="12" rx="1" fill="currentColor" /><rect x="9.5" y="2" width="3.5" height="12" rx="1" fill="currentColor" /></svg>
-          ) : (
-            <svg viewBox="0 0 16 16" width="14" height="14"><path d="M4 2.5v11a.5.5 0 0 0 .77.42l8.5-5.5a.5.5 0 0 0 0-.84l-8.5-5.5A.5.5 0 0 0 4 2.5z" fill="currentColor" /></svg>
-          )}
-        </button>
+        <Button
+          className="play"
+          intent="primary"
+          size="large"
+          icon={playing ? 'pause' : 'play'}
+          onClick={() => onPlay(!playing)}
+          aria-label={playing ? 'Pause' : 'Play the day'}
+        />
         <div className="timeline-readout">
           <div className="timeline-time">{hour == null ? 'All day' : `${hourLabel(hour)}–${hourLabel(hour + 1)} ET`}</div>
-          <button className="link" onClick={() => onHour(null)} disabled={hour == null}>
-            Show all day
-          </button>
+          <Button variant="minimal" size="small" className="all-day" onClick={() => onHour(null)} disabled={hour == null} text="Show all day" />
         </div>
       </div>
       <div className="timeline-chart" onMouseLeave={() => setHover(null)}>
@@ -85,6 +85,6 @@ export default function Timeline({ day, hour, mode, playing, onHour, onPlay }: P
           </div>
         )}
       </div>
-    </div>
+    </Card>
   )
 }

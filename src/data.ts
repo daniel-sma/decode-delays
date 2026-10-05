@@ -148,17 +148,60 @@ export function decodedForArrivals(day: Day, airport: number): number[] {
   return day.airports[airport].felt.map(sum)
 }
 
-/** Search by flight number ("DL 1234", "dl1234", "1234") or tail ("N123"). */
-export function searchFlights(day: Day, q: string, limit = 8): number[] {
-  const s = q.trim().toUpperCase().replace(/\s+/g, '')
-  if (s.length < 2) return []
-  const f = day.flights
-  const hits: number[] = []
-  for (let i = 0; i < f.fn.length && hits.length < 200; i++) {
-    if (f.otherDay[i]) continue
-    const label = f.carrier[i] + f.fn[i]
-    if (label === s || f.fn[i] === s || f.tail[i].toUpperCase().startsWith(s) || label.startsWith(s)) hits.push(i)
+
+export interface Root {
+  cat: number
+  airport: number
+  /** legs back along the tail chain (0 = this flight) */
+  hops: number
+  minutes: number
+  /** share of the flight's cause-coded delay */
+  share: number
+}
+
+/** The single biggest root cause of a flight's delay, grouped by (category, airport). */
+export function rootOf(day: Day, i: number): Root | null {
+  const cs = day.flights.decoded[i]
+  if (!cs.length) return null
+  const m = new Map<string, Root>()
+  let total = 0
+  for (const [cat, ap, , , hops, min] of cs) {
+    total += min
+    const k = `${cat}:${ap}`
+    const r = m.get(k)
+    if (r) {
+      r.minutes += min
+      r.hops = Math.max(r.hops, hops)
+    } else m.set(k, { cat, airport: ap, hops, minutes: min, share: 0 })
   }
-  // Most-delayed first — those are the interesting ones.
-  return hits.sort((a, b) => (f.arrDelay[b] ?? -1) - (f.arrDelay[a] ?? -1)).slice(0, limit)
+  const best = [...m.values()].sort((a, b) => b.minutes - a.minutes)[0]
+  best.share = total ? best.minutes / total : 0
+  return best
+}
+
+/** The reported BTS cause with the most minutes, e.g. ['late', 0.67]. */
+export function topReported(day: Day, i: number): [Reported, number] | null {
+  const c = day.flights.causes[i]
+  if (!c) return null
+  const total = sum(c)
+  const k = c.indexOf(Math.max(...c))
+  return total ? [REPORTED[k], c[k] / total] : null
+}
+
+/** Flights for the home table: biggest arrival delays, or one tail's day when a tail is searched. */
+export function delayRows(day: Day, q: string, limit = 300): { rows: number[]; tails: string[] } {
+  const f = day.flights
+  const s = q.trim().toUpperCase().replace(/\s+/g, '')
+  const idx: number[] = []
+  for (let i = 0; i < f.fn.length; i++) {
+    if (f.otherDay[i]) continue
+    if (!s) {
+      if ((f.arrDelay[i] ?? 0) >= 15) idx.push(i)
+    } else if (f.tail[i].toUpperCase().startsWith(s) || (f.carrier[i] + f.fn[i]) === s) idx.push(i)
+  }
+  const tails = [...new Set(idx.map((i) => f.tail[i]))]
+  // A single matching tail reads best as its day in order; otherwise worst first.
+  if (s && tails.length === 1) idx.sort((a, b) => f.sdep[a] - f.sdep[b])
+  else idx.sort((a, b) => (f.arrDelay[b] ?? -1) - (f.arrDelay[a] ?? -1))
+  return { rows: idx.slice(0, limit), tails }
 }
