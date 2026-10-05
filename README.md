@@ -14,27 +14,30 @@ the weather at that airport and hour, and maps where delay started and where it 
 
 ```bash
 npm install
-npm run dev                # opens with the bundled SYNTHETIC preview data (yellow banner)
+npm run dev                # http://localhost:5173, using the real data committed in public/data/
 ```
 
-To load real data (BTS July 2026, the latest released month, published Sept 21, 2026):
+`public/data/` holds real data: BTS Reporting Carrier On-Time Performance for **July 2026** (the latest
+month released, published Sept 21, 2026; 631,970 flights) and hourly ASOS/METAR weather for the 44 busiest
+airports from the Iowa Environmental Mesonet. It covers the six most disrupted days of the month.
+
+### Rebuilding the data
+
+The **Build real data** GitHub Actions workflow (`.github/workflows/build-data.yml`) downloads the sources,
+runs the pipeline and commits `public/data/`. It runs whenever the pipeline changes, or manually from the
+Actions tab, where you can pick another year, month or specific days.
+
+To build locally instead:
 
 ```bash
 pip install -r requirements.txt
-npm run data               # downloads ~30 MB from BTS + hourly METARs from Iowa Mesonet
-npm run dev
+npm run data                                                  # July 2026, the 6 most disrupted days
+python3 pipeline/build_data.py --days 2026-07-06,2026-07-28   # specific days
+python3 pipeline/build_data.py --zip path/to/download.zip     # use a BTS zip you downloaded yourself
 ```
 
-Options:
-
-```bash
-python3 pipeline/build_data.py --days 2026-07-06,2026-07-07   # pick days (default: worst day + next)
-python3 pipeline/build_data.py --zip path/to/download.zip      # if transtats.bts.gov blocks scripts, download
-                                                               # the PREZIP file in a browser and pass it here
-```
-
-BTS download page: <https://www.transtats.bts.gov/DL_SelectFields.aspx?gnoyr_VQ=FGJ&QO_fu146_anzr=b0-gvzr>
-(direct zip: `https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_2026_7.zip`).
+`npm run data:synthetic` writes an offline synthetic fixture instead. The app labels it as synthetic,
+and it's only for development without network access.
 
 ### Deploy
 
