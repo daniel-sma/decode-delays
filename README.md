@@ -116,7 +116,11 @@ Esri World Imagery, its sharper tiles draw on top; where it can't, the bundled i
 | `src/components/Panels.tsx` | Flight sidebar: header with status, route fields, root-cause rows, the aircraft's flights, and an event log |
 | `src/theme.ts`, `src/styles.css` | Category icons and labels, formatting, layout |
 
-**Colour:** one Blueprint blue marks lateness (map legs, the scrubber histogram, the plane's-day bars); grey means on time or inherited. Category identity is always an icon plus a label.
+**Colour:** graphite neutrals (page `#17181C`, panels `#202126`, section heads `#292A30`, cards `#25262B`, 1px lines
+`#303137`) with one muted purple accent (`#8067B7`) reserved for interaction, selection, focus and the active tab.
+Status stays semantic: on time `#55A87A`, late `#C99655`, severe `#C96870`. On the map, on-time legs are purple, late
+legs amber, the selected leg near-white and legs not flown yet a faint dashed white over darkened imagery. Blueprint's
+own primary blue is swapped for the purple at build time (`vite.config.ts`). Category identity is always an icon plus a label.
 
 ## Built with AI
 

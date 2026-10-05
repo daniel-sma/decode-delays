@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
 import { MapView, WebMercatorViewport, type MapViewState } from '@deck.gl/core'
-import { BitmapLayer, GeoJsonLayer, IconLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
+import { BitmapLayer, GeoJsonLayer, IconLayer, LineLayer, ScatterplotLayer, SolidPolygonLayer } from '@deck.gl/layers'
 import { TileLayer } from '@deck.gl/geo-layers'
 import { PathStyleExtension } from '@deck.gl/extensions'
 import { Button, ButtonGroup, Icon } from '@blueprintjs/core'
@@ -26,9 +26,12 @@ const VIEW = new MapView({ repeat: true })
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
 type RGBA = [number, number, number, number]
-const LATE: RGBA = [236, 154, 60, 255] // Blueprint orange-4: warning
-const ON_TIME: RGBA = [76, 144, 240, 255] // Blueprint blue-4
-const WHITE: RGBA = [255, 255, 255, 255]
+const LATE: RGBA = [201, 150, 85, 255] // --map-late
+const ON_TIME: RGBA = [128, 103, 183, 255] // --map-on-time
+const WHITE: RGBA = [241, 241, 242, 255] // --map-selected
+// Darkens the imagery so routes read first (the map frame colour, --map-frame).
+const SHADE: RGBA = [16, 17, 22, 120]
+const WORLD = [[[-180, -85], [180, -85], [180, 85], [-180, 85]]]
 const PLANE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#fff" d="M12 2c.8 0 1.4.9 1.4 2v5.2l7.6 4.6v2l-7.6-2.3v4.6l2.2 1.7V21L12 20l-3.6 1v-1.2l2.2-1.7v-4.6L3 15.8v-2l7.6-4.6V4c0-1.1.6-2 1.4-2z"/></svg>')}`
 
 interface Props {
@@ -124,22 +127,23 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
         return new BitmapLayer(props, { data: undefined, image: props.data, bounds: [west, south, east, north], opacity: 0.8 })
       },
     }),
-    new GeoJsonLayer({ id: 'states', data: states, filled: false, stroked: true, getLineColor: [255, 255, 255, 40], lineWidthMinPixels: 0.6 }),
+    new SolidPolygonLayer({ id: 'shade', data: [WORLD], getPolygon: (p) => p, getFillColor: SHADE }),
+    new GeoJsonLayer({ id: 'states', data: states, filled: false, stroked: true, getLineColor: [255, 255, 255, 31], lineWidthMinPixels: 0.6 }),
     // Legs still to fly are dashed, like a planned route.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
       id: 'upcoming', data: upcoming, getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
-      getColor: [255, 255, 255, 140], getWidth: 1.5,
+      getColor: [241, 241, 242, 102], getWidth: 1.5,
       extensions: [new PathStyleExtension({ dash: true })], getDashArray: [6, 5],
     }),
     new LineLayer<Leg>({
       id: 'flown', data: flown, getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
-      getColor: (l) => (l.late ? LATE : ON_TIME), getWidth: 3, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 160],
+      getColor: (l) => (l.late ? LATE : ON_TIME), getWidth: 3, pickable: true, autoHighlight: true, highlightColor: [241, 241, 242, 160],
     }),
     // Selected leg: dashed ahead of the plane, solid behind it.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
       id: 'selected-ahead', data: sel && !sel.cancelled && time < sel.arr ? [sel] : [],
       getSourcePosition: (l) => (planeOnSel && plane ? plane.pos : l.from), getTargetPosition: (l) => l.to,
-      getColor: [255, 255, 255, 210], getWidth: 2,
+      getColor: [241, 241, 242, 210], getWidth: 2,
       extensions: [new PathStyleExtension({ dash: true })], getDashArray: [6, 5],
       updateTriggers: { getSourcePosition: [time] },
     }),
@@ -151,7 +155,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     new ScatterplotLayer<number>({
       id: 'airports', data: airports,
       getPosition: (a) => [day.airports[a].lon, day.airports[a].lat], getRadius: 4, radiusUnits: 'pixels',
-      getFillColor: WHITE, stroked: true, getLineColor: [17, 24, 32, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
+      getFillColor: WHITE, stroked: true, getLineColor: [16, 17, 22, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
     }),
     new IconLayer({
       id: 'plane', data: plane ? [plane] : [],
@@ -226,8 +230,8 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       </div>
 
       <div className="map-legend">
-        <span><i style={{ background: '#4c90f0' }} />On time</span>
-        <span><i style={{ background: '#ec9a3c' }} />15+ min late</span>
+        <span><i style={{ background: '#8067b7' }} />On time</span>
+        <span><i style={{ background: '#c99655' }} />15+ min late</span>
         <span><i className="sel" />Selected</span>
         <span><i className="future" />Not flown yet</span>
       </div>
