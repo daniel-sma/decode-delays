@@ -78,19 +78,21 @@ Outputs go to `public/data/`: `summary.json` (month strip and trace stats) and `
 The UI is built on **[Blueprint](https://blueprintjs.com/docs/)** (`@blueprintjs/core`, `icons`, `table`, v6),
 Palantir's open-source React toolkit for data-dense interfaces, in its dark theme.
 
-Layout takes cues from Palantir Foundry operations apps: an icon rail, a context panel, dense KPI tiles,
-a check-list of root causes, and map callouts with key/value rows per airport.
+The look is a glass treatment of Blueprint's dark theme: translucent, blurred panels over a navy gradient,
+on one spacing scale (4/8/12/16/24). The flight page's scrubber borrows from Palantir's ops-console video
+timelines.
 
 | File | What it does |
 |---|---|
-| `src/App.tsx` | Shell: icon rail, Blueprint `Navbar` with breadcrumbs and day `SegmentedControl`, "About the data" `Drawer` |
-| `src/components/HomeView.tsx` | **Home:** context panel (dataset, pipeline steps, month strip), KPI tiles, reported vs decoded bars, root-cause check list (filters the table), tail-number search above a `Table2` of the biggest delays |
-| `src/components/FlightView.tsx` | **Flight page:** that aircraft's day on a map, the leg timeline, and the decode sidebar |
-| `src/components/FlightMap.tsx` | deck.gl map of one tail's legs (coloured by root cause, selected leg white), airport callouts with arrival/departure rows that avoid overlapping, halo where the delay began |
-| `src/components/TailTimeline.tsx` | Gantt of the plane's day: scheduled block (dashed), flown block, late portion by root cause (hatched = inherited) |
-| `src/components/Panels.tsx` | Flight sidebar: explanation sentence, stats, reported vs decoded, "where the minutes came from" table, weather at the root airport, the plane's day |
-| `src/components/CauseCompare.tsx` | Reported vs decoded 100% bars, the core comparison |
-| `src/theme.ts`, `src/styles.css` | Category colours and labels, formatting, layout. Colours reference Blueprint design tokens. |
+| `src/App.tsx` | Navbar with breadcrumbs and the calendar date picker; switches between home and a flight |
+| `src/components/DayPicker.tsx` | Month calendar in a popover. Only days with exported data can be picked; others explain why |
+| `src/components/HomeView.tsx` | **Home:** KPI tiles, a root-cause grid whose cause and airport chips filter the table, tail-number search above a `Table2` of the biggest delays |
+| `src/components/FlightView.tsx` | **Flight page:** map + scrubber + sidebar, sharing one clock. The sidebar follows the leg in the air at the playhead |
+| `src/components/FlightMap.tsx` | deck.gl map of one tail's legs (flown legs by root cause, unflown faint, selected white), the plane's position at the playhead, airport chips and detail cards |
+| `src/components/Scrubber.tsx` | Playback: clock, transport controls (start, slower, −15m, previous event, play, next event, +15m, faster), hour ruler, leg spans, and a histogram of how late the plane is running, coloured by root cause |
+| `src/components/Panels.tsx` | Flight sidebar: times, root-cause summary with weather evidence, reported vs decoded, the plane's day, and a collapsed breakdown |
+| `src/components/CauseCompare.tsx` | Reported vs decoded 100% bars |
+| `src/theme.ts`, `src/styles.css` | Category colours and labels, formatting, the glass theme |
 
 **Colour (Blueprint palette):** weather blue-4 `#4c90f0`, airspace turquoise-3 `#00a396`, airline
 vermilion-3 `#d33d17`, untraced/late-aircraft gray-3 `#8f99a8` (hatched). The three hues pass an all-pairs

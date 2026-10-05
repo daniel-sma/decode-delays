@@ -1,21 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Callout, Classes, Icon, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
+import { Button, Callout, Classes, InputGroup, NonIdealState, Section, SectionCard, Tag } from '@blueprintjs/core'
 import { Cell, Column, ColumnHeaderCell, RegionCardinality, Table2, type Region } from '@blueprintjs/table'
-import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root, type Summary } from '../data'
+import { CATS, delayRows, flightLabel, REPORTED, rootOf, route, sum, tailChain, topReported, type Day, type Root } from '../data'
 import { CAT_META, REPORTED_META, clock, dur, fmt, pct, prettyDate } from '../theme'
-import CauseCompare from './CauseCompare'
 import { RippleChain, Stat } from './Panels'
 
 interface Props {
   day: Day
-  summary: Summary
-  onDay: (d: string) => void
   onOpenFlight: (i: number) => void
 }
 
 interface Filter { cat: number | null; airport: number | null }
 
-export default function HomeView({ day, summary, onDay, onOpenFlight }: Props) {
+export default function HomeView({ day, onOpenFlight }: Props) {
   const [q, setQ] = useState('')
   const [filter, setFilter] = useState<Filter>({ cat: null, airport: null })
   const [selected, setSelected] = useState<Region[]>([])
@@ -102,8 +99,6 @@ export default function HomeView({ day, summary, onDay, onOpenFlight }: Props) {
 
   return (
     <div className="home">
-      <ContextPanel day={day} summary={summary} onDay={onDay} />
-
       <div className="home-main">
         <div className="kpis">
           <Stat label="Flights scheduled" value={fmt(t.flights)} />
@@ -114,12 +109,7 @@ export default function HomeView({ day, summary, onDay, onOpenFlight }: Props) {
           <Stat label="Traced to weather" value={pct(t.decoded.weather, repTotal)} sub={`vs ${pct(t.reported.weather, repTotal)} reported`} color={CAT_META.weather.color} />
         </div>
 
-        <div className="home-row">
-          <Section compact title="Reported vs decoded" icon="comparison" subtitle="Delay minutes, as airlines filed them and as traced">
-            <SectionCard><CauseCompare reported={REPORTED.map((k) => t.reported[k])} decoded={CATS.map((k) => t.decoded[k])} /></SectionCard>
-          </Section>
-          <RootCauseCheck day={day} roots={roots} filter={filter} onFilter={setFilter} />
-        </div>
+        <RootCauseCheck day={day} roots={roots} filter={filter} onFilter={setFilter} />
 
         <Section
           className="home-table-section"
@@ -179,74 +169,6 @@ export default function HomeView({ day, summary, onDay, onOpenFlight }: Props) {
   )
 }
 
-/** Left context panel: what this dataset is and what the pipeline did to it. */
-function ContextPanel({ day, summary, onDay }: { day: Day; summary: Summary; onDay: (d: string) => void }) {
-  const s = summary.stats
-  const steps: [string, string][] = [
-    ['Load BTS on-time data', `${fmt(s.flights)} flights, ${summary.month}`],
-    ['Chain flights by tail number', `${fmt(s.tails)} aircraft`],
-    ['Check weather at each end', `${s.wxAirports} airports, hourly METAR`],
-    ['Trace late-aircraft minutes', `${pct(summary.trace.lateTraced, summary.trace.lateMinutes)} traced to a root cause`],
-  ]
-  return (
-    <aside className="context">
-      <div>
-        <p className="eyebrow">Selected day</p>
-        <h2 className="context-title">{prettyDate(day.date)}</h2>
-        <dl className="kv">
-          <dt>Source</dt><dd>{summary.synthetic ? 'Synthetic sample' : 'BTS Reporting Carrier On-Time'}</dd>
-          <dt>Weather</dt><dd>{summary.synthetic ? 'Synthetic sample' : 'Iowa Mesonet ASOS'}</dd>
-          <dt>Built</dt><dd>{new Date(summary.generatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</dd>
-          <dt>Clock</dt><dd>Eastern time</dd>
-        </dl>
-      </div>
-
-      <div>
-        <p className="eyebrow">Pipeline</p>
-        <ol className="steps">
-          {steps.map(([title, detail]) => (
-            <li key={title}>
-              <Icon icon="tick-circle" intent="success" size={14} />
-              <div><strong>{title}</strong><span className={Classes.TEXT_MUTED}>{detail}</span></div>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      <MonthStrip summary={summary} current={day.date} onDay={onDay} />
-    </aside>
-  )
-}
-
-function MonthStrip({ summary, current, onDay }: { summary: Summary; current: string; onDay: (d: string) => void }) {
-  const [hover, setHover] = useState<string | null>(null)
-  const max = Math.max(...summary.days.map((d) => d.delayed + d.cancelled))
-  const h = summary.days.find((d) => d.date === (hover ?? current))
-  return (
-    <div>
-      <p className="eyebrow">Disruption by day</p>
-      <div className="month" onMouseLeave={() => setHover(null)}>
-        {summary.days.map((d) => {
-          const ok = summary.availableDays.includes(d.date)
-          return (
-            <button
-              key={d.date}
-              className={`month-day${d.date === current ? ' current' : ''}${ok ? ' ok' : ''}`}
-              disabled={!ok}
-              onClick={() => ok && onDay(d.date)}
-              onMouseEnter={() => setHover(d.date)}
-              aria-label={`${prettyDate(d.date)}: ${d.delayed} delayed`}
-            >
-              <span style={{ height: `${(100 * (d.delayed + d.cancelled)) / max}%` }} />
-            </button>
-          )
-        })}
-      </div>
-      <p className={`month-read ${Classes.TEXT_MUTED}`}>{h && `${prettyDate(h.date)}: ${fmt(h.delayed)} delayed · ${fmt(h.cancelled)} cancelled`}</p>
-    </div>
-  )
-}
-
 /** Foundry-style check list: one row per root cause, with the airports behind it as filter chips. */
 function RootCauseCheck({ day, roots, filter, onFilter }: {
   day: Day; roots: (Root | null)[]; filter: Filter; onFilter: (f: Filter) => void
@@ -265,15 +187,14 @@ function RootCauseCheck({ day, roots, filter, onFilter }: {
   return (
     <Section compact title="Root causes" icon="diagnosis" subtitle="Flights by their biggest root cause · click a cause or airport to filter">
       <SectionCard padded={false}>
-        <ul className="checks">
+        <ul className="checks" style={{ ['--cols' as string]: groups.length }}>
           {groups.map((g) => {
             const meta = CAT_META[CATS[g.c]]
             const catOn = filter.cat === g.c && filter.airport == null
             return (
               <li key={g.c} className={filter.cat === g.c ? 'on' : ''}>
                 <button className="check-main" aria-pressed={catOn} onClick={() => onFilter(catOn ? { cat: null, airport: null } : { cat: g.c, airport: null })}>
-                  <i className="tag-dot" style={{ background: meta.color }} />
-                  <strong>{meta.label}</strong>
+                  <strong><i className="tag-dot" style={{ background: meta.color }} />{meta.label}</strong>
                   <span className="check-tags">
                     <Tag minimal round>{fmt(g.flights)} flights</Tag>
                     <Tag minimal round>{dur(g.minutes)}</Tag>

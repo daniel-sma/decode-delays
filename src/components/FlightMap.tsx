@@ -1,24 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import DeckGL from '@deck.gl/react'
 import { WebMercatorViewport, type MapViewState } from '@deck.gl/core'
-import { ArcLayer, GeoJsonLayer, ScatterplotLayer } from '@deck.gl/layers'
+import { ArcLayer, GeoJsonLayer, IconLayer, LineLayer, ScatterplotLayer } from '@deck.gl/layers'
 import { Button, ButtonGroup, Card } from '@blueprintjs/core'
 import { feature } from 'topojson-client'
 import type { Topology } from 'topojson-specification'
 import statesTopo from 'us-atlas/states-10m.json'
 import { CATS, decodedByCat, flightLabel, type Day } from '../data'
 import { CAT_META, clock, dur, hexToRgb } from '../theme'
+import { actualArr, actualDep } from './Scrubber'
 
 const topo = statesTopo as unknown as Topology
 const states = feature(topo, topo.objects.states)
 const CAT_RGB = CATS.map((c) => hexToRgb(CAT_META[c].color))
 const ON_TIME: [number, number, number, number] = [143, 153, 168, 255]
 const LEGEND = ['weather', 'airspace', 'airline'] as const
+// A plane pointing north; masked so deck.gl tints it.
+const PLANE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#fff" d="M12 2c.8 0 1.4.9 1.4 2v5.2l7.6 4.6v2l-7.6-2.3v4.6l2.2 1.7V21L12 20l-3.6 1v-1.2l2.2-1.7v-4.6L3 15.8v-2l7.6-4.6V4c0-1.1.6-2 1.4-2z"/></svg>')}`
 
 interface Props {
   day: Day
   chain: number[]
   selected: number
+  /** minutes relative to midnight ET */
+  time: number
   onSelect: (i: number) => void
 }
 
@@ -28,6 +33,8 @@ interface Leg {
   to: [number, number]
   color: [number, number, number, number]
   cancelled: boolean
+  dep: number
+  arr: number
 }
 
 /**
@@ -35,7 +42,7 @@ interface Leg {
  * leg is white, every airport gets a small code label, and only the selected leg's two airports get
  * a detail card.
  */
-export default function FlightMap({ day, chain, selected, onSelect }: Props) {
+export default function FlightMap({ day, chain, selected, time, onSelect }: Props) {
   const f = day.flights
   const wrap = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -47,8 +54,27 @@ export default function FlightMap({ day, chain, selected, onSelect }: Props) {
     const by = decodedByCat(f.decoded[i])
     const top = by.indexOf(Math.max(...by))
     const late = (f.arrDelay[i] ?? 0) >= 15 && by[top] > 0
-    return { i, from: [o.lon, o.lat], to: [d.lon, d.lat], color: late ? CAT_RGB[top] : ON_TIME, cancelled: f.status[i].startsWith('C') }
+    return {
+      i, from: [o.lon, o.lat], to: [d.lon, d.lat], color: late ? CAT_RGB[top] : ON_TIME,
+      cancelled: f.status[i].startsWith('C'), dep: actualDep(day, i), arr: actualArr(day, i),
+    }
   }), [day, chain, f])
+
+  // Where the aircraft is at the playhead: on a leg in the air, or parked where it last landed.
+  const plane = useMemo(() => {
+    const flown = legs.filter((l) => !l.cancelled)
+    if (!flown.length) return null
+    for (const l of flown) {
+      if (time < l.dep) return { pos: l.from, angle: bearing(l.from, l.to), leg: null as Leg | null, p: 0 }
+      if (time <= l.arr) {
+        const p = l.arr > l.dep ? (time - l.dep) / (l.arr - l.dep) : 1
+        const pos: [number, number] = [l.from[0] + (l.to[0] - l.from[0]) * p, l.from[1] + (l.to[1] - l.from[1]) * p]
+        return { pos, angle: bearing(l.from, l.to), leg: l, p }
+      }
+    }
+    const last = flown[flown.length - 1]
+    return { pos: last.to, angle: bearing(last.from, last.to), leg: null as Leg | null, p: 1 }
+  }, [legs, time])
 
   const airports = useMemo(() => [...new Set(chain.flatMap((i) => [f.o[i], f.d[i]]))], [chain, f])
 
@@ -81,21 +107,38 @@ export default function FlightMap({ day, chain, selected, onSelect }: Props) {
   const layers = [
     new GeoJsonLayer({
       id: 'states', data: states, filled: true, stroked: true,
-      getFillColor: [37, 42, 49, 255], getLineColor: [64, 72, 84, 255], lineWidthMinPixels: 0.6,
+      getFillColor: [20, 30, 48, 255], getLineColor: [44, 60, 86, 255], lineWidthMinPixels: 0.6,
     }),
+    // Legs not yet flown are faint; flown legs carry their root-cause colour; the selected leg is white.
     new ArcLayer<Leg>({
       id: 'legs', data: legs,
       getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
-      getSourceColor: (l) => (l.i === selected ? [246, 247, 249, 255] : l.cancelled ? [143, 153, 168, 60] : [l.color[0], l.color[1], l.color[2], 140]),
-      getTargetColor: (l) => (l.i === selected ? [246, 247, 249, 255] : l.cancelled ? [143, 153, 168, 60] : [l.color[0], l.color[1], l.color[2], 255]),
-      getWidth: (l) => (l.i === selected ? 4 : 2.5), getHeight: 0.25,
+      getSourceColor: (l) => legColor(l, selected, time, 0.55),
+      getTargetColor: (l) => legColor(l, selected, time, 1),
+      getWidth: (l) => (l.i === selected ? 3.5 : 2.5), getHeight: 0,
       pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 120],
-      updateTriggers: { getSourceColor: [selected], getTargetColor: [selected], getWidth: [selected] },
+      updateTriggers: { getSourceColor: [selected, time], getTargetColor: [selected, time], getWidth: [selected] },
+    }),
+    new LineLayer({
+      id: 'progress', data: plane?.leg ? [plane] : [],
+      getSourcePosition: (d) => d.leg!.from, getTargetPosition: (d) => d.pos,
+      getColor: [246, 247, 249, 255], getWidth: 3.5,
     }),
     new ScatterplotLayer<number>({
       id: 'airports', data: airports,
       getPosition: (a) => [day.airports[a].lon, day.airports[a].lat], getRadius: 5, radiusUnits: 'pixels',
-      getFillColor: [246, 247, 249, 255], stroked: true, getLineColor: [28, 33, 39, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
+      getFillColor: [210, 222, 240, 255], stroked: true, getLineColor: [11, 18, 32, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
+    }),
+    new ScatterplotLayer({
+      id: 'plane-halo', data: plane ? [plane] : [],
+      getPosition: (d) => d.pos, getRadius: 16, radiusUnits: 'pixels',
+      getFillColor: [76, 144, 240, 70], stroked: true, getLineColor: [76, 144, 240, 200], getLineWidth: 1.5, lineWidthUnits: 'pixels',
+    }),
+    new IconLayer({
+      id: 'plane', data: plane ? [plane] : [],
+      getPosition: (d) => d.pos, getIcon: () => ({ url: PLANE, width: 64, height: 64, mask: true }),
+      getSize: 26, sizeUnits: 'pixels', getAngle: (d) => -d.angle, getColor: [246, 247, 249, 255],
+      updateTriggers: { getAngle: [time] },
     }),
   ]
 
@@ -167,6 +210,7 @@ export default function FlightMap({ day, chain, selected, onSelect }: Props) {
         {LEGEND.map((c) => <span key={c}><i style={{ background: CAT_META[c].color }} />{CAT_META[c].short}</span>)}
         <span><i style={{ background: '#8f99a8' }} />On time</span>
         <span><i className="sel" />Selected</span>
+        <span><i className="future" />Not flown yet</span>
       </Card>
       <ButtonGroup className="map-tools" vertical>
         <Button icon="zoom-in" onClick={() => setView({ ...view, zoom: view.zoom + 0.6 })} aria-label="Zoom in" />
@@ -175,4 +219,17 @@ export default function FlightMap({ day, chain, selected, onSelect }: Props) {
       </ButtonGroup>
     </div>
   )
+}
+
+function legColor(l: Leg, selected: number, time: number, alpha: number): [number, number, number, number] {
+  if (l.cancelled) return [143, 153, 168, 50]
+  if (l.i === selected) return [246, 247, 249, Math.round(255 * (time < l.dep ? 0.45 : alpha))]
+  if (time < l.dep) return [143, 153, 168, 55]
+  return [l.color[0], l.color[1], l.color[2], Math.round(255 * alpha)]
+}
+
+/** Screen bearing (degrees clockwise from north) from a to b, good enough at map scale. */
+function bearing(a: [number, number], b: [number, number]) {
+  const dx = (b[0] - a[0]) * Math.cos(((a[1] + b[1]) / 2) * (Math.PI / 180))
+  return (Math.atan2(dx, b[1] - a[1]) * 180) / Math.PI
 }
