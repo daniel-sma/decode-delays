@@ -52,7 +52,8 @@ and it's only for development without network access.
 ### Deploy
 
 The repo is ready for Vercel (`vercel.json`): import it at vercel.com/new, keep the detected settings, and deploy.
-Pages are marked `noindex`.
+Pages are marked `noindex`. Each flight has its own URL, e.g. `/flight/2026-07-28/WN4067/VPS-BWI`; `vercel.json`
+rewrites `/flight/*` to the app so those links can be opened or shared directly.
 
 
 `npm run build` writes a static site to `dist/` (relative paths, so any static host works). On Vercel or
