@@ -51,6 +51,10 @@ and it's only for development without network access.
 
 ### Deploy
 
+The repo is ready for Vercel (`vercel.json`): import it at vercel.com/new, keep the detected settings, and deploy.
+Pages are marked `noindex`.
+
+
 `npm run build` writes a static site to `dist/` (relative paths, so any static host works). On Vercel or
 Netlify, use build command `npm run build` and output directory `dist`. Commit `public/data/` after
 running the real pipeline so the deployed site carries the data.
