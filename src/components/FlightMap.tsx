@@ -119,8 +119,6 @@ interface Props {
   /** minutes relative to midnight ET */
   time: number
   onSelect: (i: number) => void
-  /** an airport whose card pops up without hovering (the plane just landed there) */
-  popupAp?: number | null
 }
 
 interface Leg {
@@ -134,7 +132,7 @@ interface Leg {
 }
 
 /** One aircraft's day over satellite imagery: flown legs solid, legs still to fly dashed, the plane at the playhead. */
-export default function FlightMap({ day, chain, selected, time, onSelect, popupAp = null }: Props) {
+export default function FlightMap({ day, chain, selected, time, onSelect }: Props) {
   const f = day.flights
   const wrap = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
@@ -201,8 +199,8 @@ export default function FlightMap({ day, chain, selected, time, onSelect, popupA
   const planeOnSel = plane?.leg?.i === selected
 
   const s = { o: f.o[selected], d: f.d[selected] }
-  // Cards for the selected leg's airports show only while hovered or when the plane has just landed there.
-  const cardAps = [s.o, s.d].filter((ap) => ap === hoverAp || ap === popupAp)
+  // Cards for the selected leg's airports show only while hovered.
+  const cardAps = [s.o, s.d].filter((ap) => ap === hoverAp)
   const labels = useMemo(() => {
     if (!viewport) return []
     // Pins first (an icon tile whose tail points at the airport), then every airport code, then any open card;
