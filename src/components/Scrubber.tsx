@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import { Button, Tag, Tooltip } from '@blueprintjs/core'
-import { route, type Day } from '../data'
+import { flightLabel, route, type Day } from '../data'
 import { dur } from '../theme'
 
 export const SPEEDS = [1, 2, 4, 8, 16]
@@ -63,10 +63,13 @@ interface Props {
   onTime: (t: number) => void
   onPlay: (p: boolean) => void
   onSpeed: (s: number) => void
+  hoverLeg: number | null
+  onHoverLeg: (i: number | null) => void
+  onPickLeg: (i: number) => void
 }
 
 /** Ops-console style scrubber: transport controls, an hour ruler, lateness histogram and a playhead. */
-export default function Scrubber({ day, chain, win, time, playing, speed, onTime, onPlay, onSpeed }: Props) {
+export default function Scrubber({ day, chain, win, time, playing, speed, onTime, onPlay, onSpeed, hoverLeg, onHoverLeg, onPickLeg }: Props) {
   const f = day.flights
   const track = useRef<HTMLDivElement>(null)
   const [hover, setHover] = useState<number | null>(null)
@@ -158,11 +161,20 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
           </div>
           <div className="scrub-legs">
             {legs.map((i) => (
-              <span key={i} className="leg" style={{ left: pct(actualDep(day, i)), width: `calc(${pct(actualArr(day, i))} - ${pct(actualDep(day, i))})` }} title={route(day, i)}>
+              <span
+                key={i}
+                className={`leg${i === hoverLeg ? ' hovered' : ''}`}
+                style={{ left: pct(actualDep(day, i)), width: `calc(${pct(actualArr(day, i))} - ${pct(actualDep(day, i))})` }}
+                // Hovering a leg names it and highlights it in the sidebar; clicking opens it there.
+                onPointerEnter={() => onHoverLeg(i)}
+                onPointerLeave={() => onHoverLeg(null)}
+                onPointerDown={(e) => { e.stopPropagation(); onPickLeg(i) }}
+              >
                 <em>{route(day, i)}</em>
               </span>
             ))}
           </div>
+          {hoverLeg != null && legs.includes(hoverLeg) && <LegTip day={day} i={hoverLeg} at={(actualDep(day, hoverLeg) + actualArr(day, hoverLeg)) / 2} win={win} />}
           <div className="scrub-hist">
             {[1, 2].filter((k) => k * yStep < maxLate).map((k) => <span key={k} className="grid" style={{ bottom: `${((k * yStep) / maxLate) * 100}%` }} />)}
             {bars.map((b) => b.late >= 1 && (
@@ -173,7 +185,7 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
               />
             ))}
           </div>
-          {hover != null && <span className="scrub-hover" style={{ left: pct(hover) }}><em>{clock24(hover)}</em></span>}
+          {hover != null && hoverLeg == null && <span className="scrub-hover" style={{ left: pct(hover) }}><em>{clock24(hover)}</em></span>}
           <span className="scrub-head" style={{ left: pct(time) }}>
             <i />
             <em>{clock24(time)}</em>
@@ -181,5 +193,19 @@ export default function Scrubber({ day, chain, win, time, playing, speed, onTime
         </div>
       </div>
     </div>
+  )
+}
+
+/** Card under a hovered timeline leg: flight, route and actual times, kept inside the track. */
+function LegTip({ day, i, at, win }: { day: Day; i: number; at: number; win: Window }) {
+  const x = (at - win.t0) / (win.t1 - win.t0)
+  const shift = x < 0.12 ? '0%' : x > 0.88 ? '-100%' : '-50%'
+  const dep = actualDep(day, i), arr = actualArr(day, i)
+  const late = day.flights.arrDelay[i] ?? 0
+  return (
+    <span className="leg-tip" style={{ left: `${x * 100}%`, transform: `translateX(${shift})` }}>
+      <b>{flightLabel(day, i)}</b> {route(day, i)}
+      <span>{clock24(dep)}{dayOffset(dep) && <sup>{dayOffset(dep)}</sup>} – {clock24(arr)}{dayOffset(arr) && <sup>{dayOffset(arr)}</sup>}{late >= 15 && <em> +{dur(late)}</em>}</span>
+    </span>
   )
 }

@@ -424,3 +424,14 @@ span.ws-tab { padding: 0; }
 .bp6-dark .bp6-callout { background: var(--bg-row); box-shadow: inset 0 0 0 1px var(--line); }
 .bp6-dark .bp6-callout.bp6-intent-primary > .bp6-icon:first-child { color: var(--accent-light); }
 .bp6-dark a { color: var(--accent-light); }
+
+/* ---------- timeline legs: hover names the leg and highlights it in the sidebar; click opens it */
+.leg { cursor: pointer; min-width: 6px; }
+.leg:hover, .leg.hovered { background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--accent); }
+.leg:hover em, .leg.hovered em { color: var(--ink-1); }
+.leg-tip { position: absolute; top: 46px; z-index: 2; display: flex; flex-direction: column; gap: 2px; padding: 5px var(--s-2); background: var(--bg-panel); box-shadow: inset 0 0 0 1px var(--line-strong); font-size: 12px; white-space: nowrap; pointer-events: none; }
+.leg-tip b { font-weight: 600; }
+.leg-tip span { font-family: var(--mono); font-size: 11px; color: var(--ink-2); }
+.leg-tip sup { font-size: 8px; color: var(--late); margin-left: 1px; }
+.leg-tip em { font-style: normal; color: var(--late); }
+.row.hovered:not(.selected) { background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--line-strong); }

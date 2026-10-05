@@ -22,6 +22,7 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
   const [time, setTime] = useState(() => actualDep(day, initial))
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(4)
+  const [hoverLeg, setHoverLeg] = useState<number | null>(null) // leg hovered on the timeline
 
   useEffect(() => onSelectedChange(selected), [selected]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -56,10 +57,10 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
         <div className="map-wrap">
           <FlightMap day={day} chain={chain} selected={selected} time={time} onSelect={pick} />
         </div>
-        <Scrubber day={day} chain={chain} win={win} time={time} playing={playing} speed={speed} onTime={setTime} onPlay={setPlaying} onSpeed={setSpeed} />
+        <Scrubber day={day} chain={chain} win={win} time={time} playing={playing} speed={speed} onTime={setTime} onPlay={setPlaying} onSpeed={setSpeed} hoverLeg={hoverLeg} onHoverLeg={setHoverLeg} onPickLeg={pick} />
       </div>
       <aside className="panel">
-        <FlightPanel day={day} index={selected} chain={chain} onSelect={pick} onClose={onClose} />
+        <FlightPanel day={day} index={selected} chain={chain} hovered={hoverLeg} onSelect={pick} onClose={onClose} />
       </aside>
     </main>
   )

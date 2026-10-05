@@ -24,8 +24,8 @@ const t24 = (m: number) => (
 
 // ------------------------------------------------------------------ flight sidebar
 
-export function FlightPanel({ day, index, chain, onSelect, onClose }: {
-  day: Day; index: number; chain: number[]; onSelect: (i: number) => void; onClose: () => void
+export function FlightPanel({ day, index, chain, hovered, onSelect, onClose }: {
+  day: Day; index: number; chain: number[]; hovered?: number | null; onSelect: (i: number) => void; onClose: () => void
 }) {
   const f = day.flights
   const o = day.airports[f.o[index]], d = day.airports[f.d[index]]
@@ -122,7 +122,7 @@ export function FlightPanel({ day, index, chain, onSelect, onClose }: {
       </SideSection>
 
       <SideSection title={`Aircraft ${f.tail[index] || ''}`} right={`${chain.length} flights`}>
-        <RippleChain day={day} chain={chain} selected={index} onSelect={onSelect} />
+        <RippleChain day={day} chain={chain} selected={index} hovered={hovered} onSelect={onSelect} />
       </SideSection>
 
       <SideSection title="Cost" right={ownMin + knockOn.min ? money((ownMin + knockOn.min) * COST_PER_MIN, true) : undefined}>
@@ -230,15 +230,20 @@ function buildEvents(day: Day, i: number): Ev[] {
 // ------------------------------------------------------------------ shared
 
 /** One aircraft's flights as selectable rows with a status tag each. */
-export function RippleChain({ day, chain, selected, onSelect }: {
-  day: Day; chain: number[]; selected: number; roots?: Set<number>; onSelect: (i: number) => void
+export function RippleChain({ day, chain, selected, hovered, onSelect }: {
+  day: Day; chain: number[]; selected: number; hovered?: number | null; roots?: Set<number>; onSelect: (i: number) => void
 }) {
   const f = day.flights
   return (
     <ul className="rows">
       {chain.map((i) => (
         <li key={i}>
-          <button className={`row${i === selected ? ' selected' : ''}`} onClick={() => onSelect(i)}>
+          <button
+            className={`row${i === selected ? ' selected' : ''}${i === hovered ? ' hovered' : ''}`}
+            onClick={() => onSelect(i)}
+            // A leg hovered on the timeline scrolls its row into view.
+            ref={i === hovered ? (el) => el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) : undefined}
+          >
             <Icon icon="airplane" size={14} />
             <span className="row-main">
               <b>{flightLabel(day, i)}</b>
