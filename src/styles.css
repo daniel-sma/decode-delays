@@ -449,3 +449,32 @@ span.ws-tab { padding: 0; }
 /* ---------- cost: the total sits in its own row under the breakdown */
 .row.static.total { margin-top: var(--s-1); background: var(--bg-head); box-shadow: inset 0 0 0 1px var(--line-strong); }
 .row.static.total .row-main b, .row.static.total .row-num { font-weight: 600; color: var(--ink-1); }
+
+/* ---------- flight sidebar spacing: one rhythm everywhere
+   16px panel gutter on every side, 16px above each section title and 8px under it, 8px between every box
+   (facts, root causes, flights, costs, events), 16px under the last box, 12px inside every box. */
+/* The scrollbar is hidden (the panel still scrolls) so a scrollbar never eats into the right margin. */
+.panel { overflow-x: hidden; scrollbar-width: none; }
+.panel::-webkit-scrollbar { display: none; }
+.side-head { padding: var(--s-3) var(--s-3) var(--s-3) var(--s-4); }
+.side-section > header { padding: var(--s-4) var(--s-4) var(--s-2); }
+.side-body, .facts-wrap { padding: 0 var(--s-4) var(--s-4); gap: var(--s-2); }
+.facts-wrap { padding-top: var(--s-4); }
+.facts, .rows, .events { gap: var(--s-2); }
+.side-note { margin: 0; }
+.fact { padding: 10px var(--s-3); }
+
+/* Every list item is the same box: card surface, 1px line, 40px tall, 12px side padding */
+.row, .row.static.sub, .events li {
+  min-height: 40px; padding: 6px var(--s-3); background: var(--bg-row); box-shadow: inset 0 0 0 1px var(--line);
+}
+.row.selected { background: var(--sel); box-shadow: inset 2px 0 0 var(--accent), inset 0 0 0 1px var(--line); }
+.row.hovered:not(.selected) { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.row.static.total { margin-top: 0; background: var(--bg-head); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.row.static.sub .row-main span { font-size: 13px; color: var(--ink-1); }
+
+/* Event log: the same boxes, icon | text | time */
+.events li { grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: var(--s-2); font-size: 13px; color: var(--ink-1); }
+.events li + li::before { display: none; }
+.events li > .bp6-icon { margin-top: 0; }
+.ev-time { font-size: 12px; white-space: nowrap; }
