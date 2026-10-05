@@ -109,13 +109,12 @@ export default function App() {
       <Navbar className="topbar">
         <NavbarGroup align={Alignment.START} className="topbar-left">
           <NavbarHeading className="brand">
-            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={32} height={32} />
-            <span>Southwest DeTrace</span>
+            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="Southwest DeTrace" width={32} height={32} />
           </NavbarHeading>
           <NavbarDivider />
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={active == null} className={`ws-tab${active == null ? ' on' : ''}`} onClick={() => showTab(null)}>
-              <Icon icon="th-list" size={16} /> Biggest delays
+              <Icon icon="th-list" size={16} /> DeTrace
             </button>
             {day && tabs.map((t) => (
               <span key={t.id} role="tab" aria-selected={active === t.id} className={`ws-tab${active === t.id ? ' on' : ''}`}>
