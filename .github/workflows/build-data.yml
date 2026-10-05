@@ -1,0 +1,72 @@
+# Builds public/data/ from real sources (BTS on-time data + Iowa Mesonet ASOS weather) and commits it.
+# Runs on GitHub's runners, which can reach transtats.bts.gov and mesonet.agron.iastate.edu.
+name: Build real data
+
+on:
+  workflow_dispatch:
+    inputs:
+      year:
+        description: BTS year
+        default: "2026"
+      month:
+        description: BTS month (1-12)
+        default: "7"
+      days:
+        description: Comma-separated YYYY-MM-DD days to export (blank = worst day + next)
+        default: ""
+  push:
+    paths:
+      - .github/workflows/build-data.yml
+      - pipeline/build_data.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Download BTS Reporting Carrier On-Time Performance
+        env:
+          YEAR: ${{ inputs.year || '2026' }}
+          MONTH: ${{ inputs.month || '7' }}
+        run: |
+          mkdir -p raw
+          url="https://transtats.bts.gov/PREZIP/On_Time_Reporting_Carrier_On_Time_Performance_1987_present_${YEAR}_${MONTH}.zip"
+          curl -fL --retry 4 --retry-delay 5 -A "Mozilla/5.0 (decode-delays data build)" -o "raw/bts_${YEAR}_${MONTH}.zip" "$url"
+          ls -la raw
+          unzip -l "raw/bts_${YEAR}_${MONTH}.zip"
+
+      - name: Run pipeline
+        env:
+          YEAR: ${{ inputs.year || '2026' }}
+          MONTH: ${{ inputs.month || '7' }}
+          DAYS: ${{ inputs.days || '' }}
+        run: |
+          args=(--year "$YEAR" --month "$MONTH" --zip "raw/bts_${YEAR}_${MONTH}.zip")
+          if [ -n "$DAYS" ]; then args+=(--days "$DAYS"); fi
+          python pipeline/build_data.py "${args[@]}"
+          ls -la public/data
+          python -c "import json; s=json.load(open('public/data/summary.json')); assert not s['synthetic']; print(s['availableDays'], s['stats'], s['trace'])"
+
+      - name: Commit data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A public/data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Build real data: BTS ${{ inputs.year || '2026' }}-${{ inputs.month || '7' }} + IEM ASOS weather"
+          git push
