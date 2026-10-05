@@ -35,7 +35,9 @@ const WHITE: RGBA = [241, 243, 245, 255] // --map-selected
 // Darkens the imagery so routes read first (the map frame colour, --map-frame).
 const SHADE: RGBA = [17, 21, 26, 120]
 const WORLD = [[[-180, -85], [180, -85], [180, 85], [-180, 85]]]
-const PLANE = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64"><path fill="#fff" d="M12 2c.8 0 1.4.9 1.4 2v5.2l7.6 4.6v2l-7.6-2.3v4.6l2.2 1.7V21L12 20l-3.6 1v-1.2l2.2-1.7v-4.6L3 15.8v-2l7.6-4.6V4c0-1.1.6-2 1.4-2z"/></svg>')}`
+// Map marker: the plane artwork faces east (nose right), so it turns by 90° less than the bearing.
+const PLANE = `${import.meta.env.BASE_URL}brand/plane.png`
+const PLANE_HEADING = 90
 
 interface Props {
   day: Day
@@ -162,8 +164,8 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     }),
     new IconLayer({
       id: 'plane', data: plane ? [plane] : [],
-      getPosition: (d) => d.pos, getIcon: () => ({ url: PLANE, width: 64, height: 64, mask: true }),
-      getSize: 28, sizeUnits: 'pixels', getAngle: (d) => -d.angle, getColor: WHITE, updateTriggers: { getAngle: [time] },
+      getPosition: (d) => d.pos, getIcon: () => ({ url: PLANE, width: 256, height: 256, mask: false }),
+      getSize: 40, sizeUnits: 'pixels', getAngle: (d) => PLANE_HEADING - d.angle, updateTriggers: { getAngle: [time] },
     }),
   ]
 
