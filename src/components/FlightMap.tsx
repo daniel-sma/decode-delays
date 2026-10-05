@@ -119,6 +119,8 @@ interface Props {
   /** minutes relative to midnight ET */
   time: number
   onSelect: (i: number) => void
+  /** an airport whose card pops up without hovering (the plane just landed there) */
+  popupAp?: number | null
 }
 
 interface Leg {
@@ -132,13 +134,14 @@ interface Leg {
 }
 
 /** One aircraft's day over satellite imagery: flown legs solid, legs still to fly dashed, the plane at the playhead. */
-export default function FlightMap({ day, chain, selected, time, onSelect }: Props) {
+export default function FlightMap({ day, chain, selected, time, onSelect, popupAp = null }: Props) {
   const f = day.flights
   const wrap = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [view, setView] = useState<MapViewState>({ longitude: -96, latitude: 38.5, zoom: 3.6 })
   const [fitKey, setFitKey] = useState(0)
   const [world, setWorld] = useState<World | null>(null)
+  const [hoverAp, setHoverAp] = useState<number | null>(null) // airport under the pointer
   useEffect(() => { loadWorld().then(setWorld).catch(() => {}) }, [])
 
   const legs = useMemo<Leg[]>(() => chain.map((i) => {
@@ -198,11 +201,12 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const planeOnSel = plane?.leg?.i === selected
 
   const s = { o: f.o[selected], d: f.d[selected] }
+  // Cards for the selected leg's airports show only while hovered or when the plane has just landed there.
+  const cardAps = [s.o, s.d].filter((ap) => ap === hoverAp || ap === popupAp)
   const labels = useMemo(() => {
     if (!viewport) return []
-    // The selected leg's two airports first, then the rest; each takes the first spot that doesn't collide.
-    // The selected airports also get a pin (an icon tile whose tail points at the airport), placed first.
-    const order = [s.o, s.d, ...airports.filter((a) => a !== s.o && a !== s.d)]
+    // Pins first (an icon tile whose tail points at the airport), then every airport code, then any open card;
+    // each takes the first spot that doesn't collide, so opening a card never moves the codes.
     const placed: { x: number; y: number; w: number; h: number }[] = []
     const hit = (b: { x: number; y: number; w: number; h: number }) =>
       placed.some((o) => b.x < o.x + o.w + 4 && b.x + b.w + 4 > o.x && b.y < o.y + o.h + 4 && b.y + b.h + 4 > o.y)
@@ -213,25 +217,33 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     }
     const pins = [s.o, s.d].map((ap) => { const [x, y] = at(ap); return { x: x - PIN / 2, y: y - PIN - PIN_TAIL, w: PIN, h: PIN + PIN_TAIL } })
     placed.push(...pins)
-    return order.map((ap) => {
+    const place = (ap: number, card: boolean) => {
       const [x, y] = at(ap)
-      const detail = ap === s.o || ap === s.d
-      const w = detail ? 196 : 44, h = detail ? 44 : 18, g = 8
-      const spots = detail
+      const pinned = ap === s.o || ap === s.d
+      const w = card ? 196 : 44, h = card ? 44 : 18, g = 8
+      const side = pinned ? PIN / 2 + g : g // codes and cards sit beside a pin, not under it
+      const spots = card
         ? [
-            { x: x + PIN / 2 + g, y: y - h }, { x: x - PIN / 2 - g - w, y: y - h }, { x: x - w / 2, y: y + g },
+            { x: x + side, y: y - h }, { x: x - side - w, y: y - h }, { x: x - w / 2, y: y + g },
             { x: x + g, y: y + g }, { x: x - w - g, y: y + g }, { x: x - w / 2, y: y - PIN - PIN_TAIL - h - g },
           ]
         : [
-            { x: x - w / 2, y: y - h - g }, { x: x - w / 2, y: y + g }, { x: x + g, y: y - h / 2 }, { x: x - w - g, y: y - h / 2 },
-            { x: x + g, y: y - h - g }, { x: x - w - g, y: y + g }, { x: x + g, y: y + g }, { x: x - w - g, y: y - h - g },
+            ...(pinned ? [] : [{ x: x - w / 2, y: y - h - g }]), { x: x - w / 2, y: y + g }, { x: x + side, y: y - h / 2 },
+            { x: x - side - w, y: y - h / 2 }, { x: x + side, y: y - h - g }, { x: x - w - g, y: y + g }, { x: x + g, y: y + g },
+            { x: x - w - side, y: y - h - g },
           ]
-      const spot = spots.find((p) => !hit({ ...p, w, h })) ?? spots[0]
+      // Prefer spots fully inside the map (cards must never run off the edge), then ones that don't collide.
+      const inside = (p: { x: number; y: number }) => p.x >= 4 && p.y >= 4 && p.x + w <= size.width - 4 && p.y + h <= size.height - 4
+      const fits = card ? spots.filter(inside) : spots
+      const clampIn = (p: { x: number; y: number }) => ({ x: Math.max(4, Math.min(size.width - w - 4, p.x)), y: Math.max(4, Math.min(size.height - h - 4, p.y)) })
+      const spot = fits.find((p) => !hit({ ...p, w, h })) ?? fits[0] ?? (card ? clampIn(spots[0]) : spots[0])
       placed.push({ ...spot, w, h })
-      const pin = detail ? pins[ap === s.o ? 0 : 1] : null
-      return { ap, detail, box: { ...spot, w, h }, pin }
-    })
-  }, [viewport, airports, day, s.o, s.d, view.longitude])
+      return { ap, detail: card, box: { ...spot, w, h }, pin: card ? null : pinned ? pins[ap === s.o ? 0 : 1] : null }
+    }
+    const codes = airports.map((ap) => place(ap, false))
+    const cards = cardAps.map((ap) => place(ap, true))
+    return [...codes.filter((c) => !cardAps.includes(c.ap)), ...cards]
+  }, [viewport, airports, day, s.o, s.d, view.longitude, cardAps.join(), size])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // Place names that fit: biggest places first; each needs room on screen and must not overlap a name already
   // placed or an airport dot and its code.
@@ -310,6 +322,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       id: 'airports', data: airports,
       getPosition: (a) => [day.airports[a].lon, day.airports[a].lat], getRadius: 4, radiusUnits: 'pixels',
       getFillColor: WHITE, stroked: true, getLineColor: [11, 11, 11, 255], getLineWidth: 2, lineWidthUnits: 'pixels',
+      pickable: true, radiusMinPixels: 4, onHover: (info) => setHoverAp(info.object ?? null),
     }),
     new IconLayer({
       id: 'plane', data: plane ? [plane] : [],
@@ -339,11 +352,18 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
         } : null}
       />
       <div className="map-labels" aria-hidden>
-        {labels.map(({ ap, pin }) => pin && (
-          <span key={`pin-${ap}`} className="map-pin" style={{ left: pin.x, top: pin.y }}>
-            <Icon icon={ap === s.o ? 'map-marker' : 'flag'} size={14} />
-          </span>
-        ))}
+        {viewport && [s.o, s.d].map((ap) => {
+          const a = day.airports[ap]
+          const [x, y] = viewport.project([a.lon + 360 * Math.round((view.longitude - a.lon) / 360), a.lat])
+          return (
+            <span
+              key={`pin-${ap}`} className={`map-pin${cardAps.includes(ap) ? ' on' : ''}`} style={{ left: x - PIN / 2, top: y - PIN - PIN_TAIL }}
+              onPointerEnter={() => setHoverAp(ap)} onPointerLeave={() => setHoverAp(null)}
+            >
+              <Icon icon={ap === s.o ? 'map-marker' : 'flag'} size={14} />
+            </span>
+          )
+        })}
         {labels.map(({ ap, detail, box }) => {
           const code = day.airports[ap].code
           if (!detail) return <span key={ap} className="map-label" style={{ left: box.x, top: box.y, width: box.w }}>{code}</span>

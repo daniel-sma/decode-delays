@@ -108,7 +108,9 @@ arrival, `-`/`=` change speed, `Home` returns to the start of the day, and `↑`
 The map is a dark vector basemap drawn by deck.gl, with no tile server: near-black water, dark land and faint
 country, coast and US state lines from Natural Earth (`world-atlas` countries at 1:50m, `us-atlas` states), plus
 quiet water-body labels and place names: countries, and US states once zoomed in. A name shows only where its
-place is wide enough on screen and it doesn't overlap a bigger place's name or an airport. It works offline and inside sandboxed previews.
+place is wide enough on screen and it doesn't overlap a bigger place's name or an airport. The selected flight's
+airports carry pins; hovering one opens its card (time and delay). Playback pauses whenever the plane lands and pops
+up the arrival card, which closes when play is pressed again or the playhead moves. It works offline and inside sandboxed previews.
 
 | File | What it does |
 |---|---|

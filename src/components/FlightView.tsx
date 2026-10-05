@@ -24,6 +24,9 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(4)
   const [hoverLeg, setHoverLeg] = useState<number | null>(null) // leg hovered on the timeline
+  // Playback pauses when the plane lands; the arrival card pops up until play is pressed again or time moves.
+  const [landed, setLanded] = useState(false)
+  const arrivals = useMemo(() => chain.filter((i) => !day.flights.status[i].startsWith('C')).map((i) => actualArr(day, i)), [day, chain])
 
   useEffect(() => onSelectedChange(selected), [selected]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -32,12 +35,17 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
     const id = setInterval(() => {
       setTime((t) => {
         const next = t + speed
+        const landing = arrivals.find((a) => a > t && a <= next)
+        if (landing != null) { setPlaying(false); setLanded(true); return landing }
         if (next >= win.t1) { setPlaying(false); return win.t1 }
         return next
       })
     }, TICK_MS)
     return () => clearInterval(id)
-  }, [playing, speed, win.t1])
+  }, [playing, speed, win.t1, arrivals])
+  useEffect(() => { if (playing) setLanded(false) }, [playing])
+  // Moving the playhead by hand (scrubber, keys, picking a flight) closes the arrival card.
+  const moveTo = (t: number) => { setLanded(false); setTime(t) }
 
   // The sidebar follows whichever leg is in the air at the playhead.
   useEffect(() => {
@@ -49,7 +57,7 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
   const pick = (i: number) => {
     setPlaying(false)
     setSelected(i)
-    if (!day.flights.status[i].startsWith('C')) setTime(actualDep(day, i))
+    if (!day.flights.status[i].startsWith('C')) moveTo(actualDep(day, i))
   }
 
   // Up / down step through this aircraft's flights, like the sidebar list.
@@ -65,9 +73,9 @@ export default function FlightView({ day, initial, onSelectedChange, onClose }: 
     <main className="flight-page">
       <div className="flight-stage">
         <div className="map-wrap">
-          <FlightMap day={day} chain={chain} selected={selected} time={time} onSelect={pick} />
+          <FlightMap day={day} chain={chain} selected={selected} time={time} onSelect={pick} popupAp={landed ? day.flights.d[selected] : null} />
         </div>
-        <Scrubber day={day} chain={chain} win={win} time={time} playing={playing} speed={speed} onTime={setTime} onPlay={setPlaying} onSpeed={setSpeed} hoverLeg={hoverLeg} onHoverLeg={setHoverLeg} onPickLeg={pick} />
+        <Scrubber day={day} chain={chain} win={win} time={time} playing={playing} speed={speed} onTime={moveTo} onPlay={setPlaying} onSpeed={setSpeed} hoverLeg={hoverLeg} onHoverLeg={setHoverLeg} onPickLeg={pick} />
       </div>
       <aside className="panel">
         <FlightPanel day={day} index={selected} chain={chain} hovered={hoverLeg} onSelect={pick} onClose={onClose} />
