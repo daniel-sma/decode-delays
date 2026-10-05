@@ -109,21 +109,21 @@ export default function App() {
       <Navbar className="topbar">
         <NavbarGroup align={Alignment.START} className="topbar-left">
           <NavbarHeading className="brand">
-            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={22} height={22} />
-            <span>DeTrace</span>
+            <img src={`${import.meta.env.BASE_URL}brand/southwest-heart.png`} alt="" width={32} height={32} />
+            <span>Southwest DeTrace</span>
           </NavbarHeading>
           <NavbarDivider />
           <div className="tabs" role="tablist">
             <button role="tab" aria-selected={active == null} className={`ws-tab${active == null ? ' on' : ''}`} onClick={() => showTab(null)}>
-              <Icon icon="th-list" size={14} /> Biggest delays
+              <Icon icon="th-list" size={16} /> Biggest delays
             </button>
             {day && tabs.map((t) => (
               <span key={t.id} role="tab" aria-selected={active === t.id} className={`ws-tab${active === t.id ? ' on' : ''}`}>
                 <button className="ws-tab-label" onClick={() => showTab(t)} title={`${t.tail} · ${route(day, t.selected)}`}>
-                  <Icon icon="airplane" size={14} /> {flightLabel(day, t.selected)} · {route(day, t.selected)}
+                  <Icon icon="airplane" size={16} /> {flightLabel(day, t.selected)} · {route(day, t.selected)}
                 </button>
                 <button className="ws-tab-close" aria-label={`Close ${flightLabel(day, t.selected)}`} onClick={() => closeTab(t.id)}>
-                  <Icon icon="small-cross" size={14} />
+                  <Icon icon="small-cross" size={16} />
                 </button>
               </span>
             ))}
