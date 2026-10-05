@@ -26,8 +26,11 @@ const VIEW = new MapView({ repeat: true })
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
 
 type RGBA = [number, number, number, number]
-const LATE: RGBA = [201, 150, 85, 255] // --map-late
-const ON_TIME: RGBA = [128, 103, 183, 255] // --map-on-time
+// Leg colours match the sidebar's status tags: on time, 15+ min late, 3h+ late.
+const ON_TIME: RGBA = [85, 168, 122, 255] // --on-time
+const LATE: RGBA = [201, 150, 85, 255] // --late
+const SEVERE: RGBA = [201, 104, 112, 255] // --severe
+const SEVERE_MIN = 180 // same threshold as statusTag
 const WHITE: RGBA = [241, 241, 242, 255] // --map-selected
 // Darkens the imagery so routes read first (the map frame colour, --map-frame).
 const SHADE: RGBA = [16, 17, 22, 120]
@@ -47,7 +50,7 @@ interface Leg {
   i: number
   from: [number, number]
   to: [number, number]
-  late: boolean
+  late: number // arrival delay, minutes
   cancelled: boolean
   dep: number
   arr: number
@@ -64,7 +67,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
   const legs = useMemo<Leg[]>(() => chain.map((i) => {
     const o = day.airports[f.o[i]], d = day.airports[f.d[i]]
     return {
-      i, from: [o.lon, o.lat], to: [d.lon, d.lat], late: (f.arrDelay[i] ?? 0) >= 15,
+      i, from: [o.lon, o.lat], to: [d.lon, d.lat], late: f.arrDelay[i] ?? 0,
       cancelled: f.status[i].startsWith('C'), dep: actualDep(day, i), arr: actualArr(day, i),
     }
   }), [day, chain, f])
@@ -137,7 +140,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
     }),
     new LineLayer<Leg>({
       id: 'flown', data: flown, getSourcePosition: (l) => l.from, getTargetPosition: (l) => l.to,
-      getColor: (l) => (l.late ? LATE : ON_TIME), getWidth: 3, pickable: true, autoHighlight: true, highlightColor: [241, 241, 242, 160],
+      getColor: (l) => (l.late >= SEVERE_MIN ? SEVERE : l.late >= 15 ? LATE : ON_TIME), getWidth: 3, pickable: true, autoHighlight: true, highlightColor: [241, 241, 242, 160],
     }),
     // Selected leg: dashed ahead of the plane, solid behind it.
     new LineLayer<Leg, { getDashArray: [number, number] }>({
@@ -222,7 +225,7 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
                 <span>{isOrigin ? 'Departs' : 'Arrives'}</span>
               </div>
               <div className="map-callout-row">
-                {cancelled ? 'Cancelled' : <>{clock(isOrigin ? dep : arr)}{late != null && late >= 15 && <b className="late"> +{dur(late)}</b>}</>}
+                {cancelled ? 'Cancelled' : <>{clock(isOrigin ? dep : arr)}{late != null && late >= 15 && <b className={late >= SEVERE_MIN ? 'late severe' : 'late'}> +{dur(late)}</b>}</>}
               </div>
             </div>
           )
@@ -230,8 +233,9 @@ export default function FlightMap({ day, chain, selected, time, onSelect }: Prop
       </div>
 
       <div className="map-legend">
-        <span><i style={{ background: '#8067b7' }} />On time</span>
+        <span><i style={{ background: '#55a87a' }} />On time</span>
         <span><i style={{ background: '#c99655' }} />15+ min late</span>
+        <span><i style={{ background: '#c96870' }} />3h+ late</span>
         <span><i className="sel" />Selected</span>
         <span><i className="future" />Not flown yet</span>
       </div>

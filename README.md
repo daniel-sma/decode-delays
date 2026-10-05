@@ -118,8 +118,8 @@ Esri World Imagery, its sharper tiles draw on top; where it can't, the bundled i
 
 **Colour:** graphite neutrals (page `#17181C`, panels `#202126`, section heads `#292A30`, cards `#25262B`, 1px lines
 `#303137`) with one muted purple accent (`#8067B7`) reserved for interaction, selection, focus and the active tab.
-Status stays semantic: on time `#55A87A`, late `#C99655`, severe `#C96870`. On the map, on-time legs are purple, late
-legs amber, the selected leg near-white and legs not flown yet a faint dashed white over darkened imagery. Blueprint's
+Status stays semantic: on time `#55A87A`, late `#C99655`, severe `#C96870`. On the map, legs use the same colours as the
+sidebar's status tags (green on time, amber 15+ min late, red 3h+ late), the selected leg near-white and legs not flown yet a faint dashed white over darkened imagery. Blueprint's
 own primary blue is swapped for the purple at build time (`vite.config.ts`). Category identity is always an icon plus a label.
 
 ## Built with AI

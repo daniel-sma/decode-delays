@@ -33,8 +33,9 @@
   --tab-active-bg: #28292f;
   --tab-active-edge: #3b3943;
   --tab-active-accent: #8067b7;
-  --map-on-time: #8067b7;
+  --map-on-time: #55a87a;
   --map-late: #c99655;
+  --map-severe: #c96870;
   --map-selected: #f1f1f2;
   --map-upcoming: rgba(241, 241, 242, 0.4);
   --map-borders: rgba(255, 255, 255, 0.12);
@@ -435,3 +436,4 @@ span.ws-tab { padding: 0; }
 .leg-tip sup { font-size: 8px; color: var(--late); margin-left: 1px; }
 .leg-tip em { font-style: normal; color: var(--late); }
 .row.hovered:not(.selected) { background: var(--bg-hover); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.late.severe { color: var(--severe); }
